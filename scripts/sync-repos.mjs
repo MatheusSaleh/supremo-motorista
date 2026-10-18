@@ -2,12 +2,29 @@
 // Para cada branch, leva o lado mais novo para o outro. Só avança histórico (fast-forward), nunca força:
 // se os dois lados divergiram (commits diferentes em cada um), avisa e não mexe nessa branch.
 // Também atualiza a branch local quando ela está atrás.
+//
+// `--delete <branch>` apaga a branch nos dois repositórios (usado pelo workflow quando alguém apaga uma
+// branch num deles; sem isso, o sync a recriaria a partir do outro).
+//
+// Acesso: na máquina do desenvolvedor usa a chave SSH; no GitHub Actions usa o token em SYNC_TOKEN
+// (fine-grained, com "Contents: read and write" nos dois repositórios). Ver .github/workflows/sync.yml.
 import { execFileSync } from 'node:child_process';
 
-const REMOTES = {
-  pessoal: 'git@github.com:MatheusSaleh/supremo-motorista.git',
-  nexolabs: 'git@github.com:nexolabs-dev/supremo-motorista.git',
+const REPOS = {
+  pessoal: 'MatheusSaleh/supremo-motorista',
+  nexolabs: 'nexolabs-dev/supremo-motorista',
 };
+const token = process.env.SYNC_TOKEN;
+if (process.env.GITHUB_ACTIONS && !token) {
+  console.log('::warning::Segredo SYNC_TOKEN não configurado neste repositório; sincronização ignorada.');
+  process.exit(0);
+}
+const REMOTES = Object.fromEntries(
+  Object.entries(REPOS).map(([name, slug]) => [
+    name,
+    token ? `https://x-access-token:${token}@github.com/${slug}.git` : `git@github.com:${slug}.git`,
+  ]),
+);
 
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
 const tryGit = (...args) => {
@@ -18,6 +35,21 @@ const tryGit = (...args) => {
   }
 };
 const isAncestor = (a, b) => tryGit('merge-base', '--is-ancestor', a, b) !== null;
+
+const deleteAt = process.argv.indexOf('--delete');
+if (deleteAt !== -1) {
+  const branch = process.argv[deleteAt + 1] ?? '';
+  if (tryGit('check-ref-format', '--branch', branch) === null) {
+    console.error(`Nome de branch inválido: "${branch}"`);
+    process.exit(1);
+  }
+  for (const [name, url] of Object.entries(REMOTES)) {
+    if (!tryGit('ls-remote', url, `refs/heads/${branch}`)) continue; // já não existe (ex.: o outro lado já apagou)
+    git('push', '--quiet', url, '--delete', branch);
+    console.log(`✕ ${branch}: apagada em ${name}`);
+  }
+  process.exit(0);
+}
 
 // Remotes de sincronização (independentes do "origin"): refs em refs/sync/<nome>/<branch>.
 const heads = {};

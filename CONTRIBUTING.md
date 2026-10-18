@@ -22,11 +22,19 @@ O projeto existe em dois repositórios privados, mantidos iguais:
 - `MatheusSaleh/supremo-motorista` (pessoal)
 - `nexolabs-dev/supremo-motorista` (organização)
 
-Na máquina do mantenedor, `git push` envia para os dois de uma vez (o `origin` tem duas URLs de envio).
-De qualquer máquina, `npm run sync` traz o que houver de novo em um dos lados e atualiza o outro. Ele só
-avança o histórico (nunca força); se os dois divergiram, avisa e não mexe.
-Para apagar uma branch, apague nos dois repositórios: se ela continuar existindo num deles, o sync a
-recria no outro.
+A sincronização é automática: o workflow `.github/workflows/sync.yml` roda a cada push ou exclusão de
+branch em qualquer um dos dois e atualiza o outro com `scripts/sync-repos.mjs`. Ele só avança o histórico
+(nunca força); se os dois lados divergiram, a execução falha com aviso e é preciso resolver com merge ou
+rebase. Apagar uma branch num repositório apaga também no outro.
+
+O workflow precisa do segredo `SYNC_TOKEN` cadastrado **nos dois** repositórios (Settings → Secrets and
+variables → Actions): um token *fine-grained* com acesso aos dois `supremo-motorista` e permissão
+*Contents: Read and write*. Sem ele, o workflow só avisa e não sincroniza. Quando o token vencer, gere outro
+e atualize o segredo nos dois.
+
+Sem depender do GitHub, `npm run sync` faz a mesma coisa a partir da sua máquina (com sua chave SSH), e
+`node scripts/sync-repos.mjs --delete <branch>` apaga uma branch nos dois. Na máquina do mantenedor,
+`git push` também já envia para os dois de uma vez (o `origin` tem duas URLs de envio).
 
 Para configurar o envio duplo num clone novo:
 
