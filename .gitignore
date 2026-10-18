@@ -1,0 +1,7 @@
+node_modules
+dist
+*.local
+release
+
+# Conversor de modelos: arquivos de origem (baixados à parte, não versionados)
+tools/conversor-modelos/entrada/

@@ -1,0 +1,139 @@
+{
+ "url": "/entrada/fusion.glb",
+ "drop": "interior_body|interior_panel|chair|pedal|mirror_c|st_wheel|trunk_interior|__lr",
+ "dropMat": "^interior_",
+ "mats": [
+  {
+   "mat": "^carpaint$",
+   "to": "paint"
+  },
+  {
+   "mat": "^windowglass$",
+   "to": "glass"
+  },
+  {
+   "mat": "^redglass$",
+   "to": "taillight"
+  },
+  {
+   "mat": "^clearglass$",
+   "node": "lights_front|farol",
+   "to": "headlight"
+  },
+  {
+   "mat": "^tire$",
+   "to": "tire"
+  }
+ ],
+ "frontKey": "headlight",
+ "backKey": "taillight",
+ "length": 4.871,
+ "wheelMode": "material",
+ "wheelKey": "tire",
+ "outputs": {
+  "hq": {
+   "budget": 65000,
+   "err": 0.015,
+   "mode": "normal",
+   "tex": 1024,
+   "preview": true
+  },
+  "lq": {
+   "budget": 10000,
+   "err": 0.06,
+   "mode": "posmerge",
+   "tex": 256,
+   "preview": true
+  }
+ },
+ "crease": 35,
+ "matOverrides": {
+  "paint": {
+   "color": "#15171a",
+   "roughness": 0.25,
+   "metalness": 0.35
+  },
+  "black": {
+   "color": "#0e0f10",
+   "roughness": 0.7
+  },
+  "chrome": {
+   "color": "#d4d7dc",
+   "metalness": 1,
+   "roughness": 0.18
+  },
+  "clearglass": {
+   "color": "#cfd6dc",
+   "roughness": 0.05,
+   "metalness": 0.2,
+   "transparent": true,
+   "opacity": 0.55
+  },
+  "headlight": {
+   "color": "#e8eef2",
+   "roughness": 0.05,
+   "metalness": 0.3,
+   "emissive": "#fff4d8",
+   "emissiveIntensity": 0.25
+  },
+  "taillight": {
+   "color": "#8a0a0a",
+   "roughness": 0.2,
+   "emissive": "#b01010",
+   "emissiveIntensity": 0.6
+  },
+  "orangeglass": {
+   "color": "#c86a10",
+   "roughness": 0.2
+  },
+  "blue": {
+   "color": "#1d3d8c",
+   "roughness": 0.3,
+   "metalness": 0.3
+  },
+  "mirror": {
+   "color": "#9aa3ad",
+   "metalness": 1,
+   "roughness": 0.05
+  },
+  "tire": {
+   "color": "#141414",
+   "roughness": 0.92
+  },
+  "material": {
+   "color": "#a9adb3",
+   "metalness": 0.8,
+   "roughness": 0.3
+  },
+  "brakedisk": {
+   "color": "#6b6b6b",
+   "metalness": 0.8,
+   "roughness": 0.45
+  },
+  "caliper": {
+   "color": "#2a2a2a",
+   "roughness": 0.6
+  },
+  "glass": {
+   "color": "#1a2228",
+   "roughness": 0.05,
+   "metalness": 0.3
+  },
+  "material_18": {
+   "color": "#2a2a2a"
+  },
+  "grid_black": {
+   "color": "#0b0b0c",
+   "roughness": 0.6
+  },
+  "grid": {
+   "color": "#1c1d1f",
+   "roughness": 0.5,
+   "metalness": 0.4
+  },
+  "white": {
+   "color": "#d8d8d8",
+   "roughness": 0.4
+  }
+ }
+}

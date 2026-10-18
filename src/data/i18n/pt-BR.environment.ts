@@ -1,0 +1,45 @@
+// Textos do ambiente: clima e horário reais de Brasília, feriados e falas ligadas a eles.
+// Nomes de feriados vêm da BrasilAPI e entram via parâmetro {name}.
+export const environmentPtBR = {
+  'env.weather.clear': 'Céu limpo',
+  'env.weather.partly': 'Poucas nuvens',
+  'env.weather.cloudy': 'Nublado',
+  'env.weather.fog': 'Neblina',
+  'env.weather.rain': 'Chuva',
+  'env.weather.storm': 'Tempestade',
+  'env.weather.dry': 'Seca',
+  'env.hud': '{temp}°C · {humidity}% · {clock}',
+  'env.hud.offline': 'Brasília (padrão) · {clock}',
+  'env.holidayBadge': 'Feriado: {name}',
+  'env.holidayEveBadge': 'Amanhã é feriado: {name}',
+  'env.testHoliday': 'Feriado de teste',
+
+  'env.toast.rain': 'Chove em Brasília agora: pista molhada, menos aderência. O ministro não quer saber.',
+  'env.toast.storm': 'Tempestade em Brasília! Pista alagada, visibilidade ruim e tesourinha virando piscina.',
+  'env.toast.fog': 'Neblina em Brasília: faróis ligados e atenção redobrada (ou não).',
+  'env.toast.dry': 'Umidade de {humidity}% em Brasília: a cidade virou deserto. Hidrate-se, Josué.',
+  'env.toast.night': 'Expediente noturno: faróis acesos e adicional noturno na diária.',
+  'env.toast.holiday': 'Hoje é {name}: recesso no Tribunal! Gorjeta em dobro e todo mundo querendo ir ao aeroporto.',
+  'env.toast.holidayEve': 'Amanhã é {name}: véspera de feriado, ministro quer emendar. Prepare-se para o aeroporto.',
+
+  'pause.realWorld': 'Clima, horário e feriados reais de Brasília (usa a internet)',
+
+  'ride.reason.emendar': 'pegar o voo e emendar o feriado',
+  'result.holiday': 'Adicional de feriado (gorjeta em dobro)',
+  'result.night': 'Adicional noturno',
+
+  'line.rain.1': 'Cuidado com a poça! Esse terno custou uma diária inteira.',
+  'line.rain.2': 'Choveu em Brasília e a cidade inteira esqueceu como se dirige.',
+  'line.rain.3': 'Devagar no molhado… mas sem atrasar a sessão, por favor.',
+  'line.rain.4': 'Em Brasília chove pouco, mas quando chove a tesourinha vira piscina.',
+  'line.dry.1': 'Umidade de deserto. Alguém tem um umidificador oficial aí?',
+  'line.dry.2': 'Essa secura racha até jurisprudência.',
+  'line.dry.3': 'Liga o ar no máximo, Josué. Ar-condicionado é verba indenizatória.',
+  'line.dry.4': 'Em agosto Brasília vira Marte, só que com mais reunião.',
+  'line.holiday.1': 'Feriado é sagrado. A pauta pode esperar até depois do recesso.',
+  'line.holiday.2': 'Emendar o feriado não é folga, é planejamento estratégico.',
+  'line.holiday.3': 'Nada como trabalhar no feriado… recebendo em dobro, claro.',
+  'line.night.1': 'Reunião que termina a essa hora nunca é boa notícia.',
+  'line.night.2': 'Brasília à noite fica tão vazia que dá para ouvir o eco das tesourinhas.',
+  'line.night.3': 'Hora extra? Isso aqui vai virar "adicional noturno retroativo".',
+} as const;

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <title>Supremo Motorista</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="hud"></div>
+    <!-- Tela de carregamento estática: aparece antes do bundle principal (~5 MB) terminar de baixar. -->
+    <div id="loading" class="indeterminate">
+      <div class="loading-box">
+        <!-- Textos preenchidos por main.ts (src/data/i18n); ficam vazios só por um instante. -->
+        <h1 data-ref="title"></h1>
+        <p class="loading-sub" data-ref="subtitle"></p>
+        <div class="loading-track"><div class="loading-bar" data-ref="bar"></div></div>
+        <div class="loading-status">
+          <span data-ref="label"></span>
+          <span data-ref="percent"></span>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
