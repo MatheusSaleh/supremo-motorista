@@ -22,7 +22,8 @@ const isAncestor = (a, b) => tryGit('merge-base', '--is-ancestor', a, b) !== nul
 // Remotes de sincronização (independentes do "origin"): refs em refs/sync/<nome>/<branch>.
 const heads = {};
 for (const [name, url] of Object.entries(REMOTES)) {
-  git('fetch', '--quiet', url, `+refs/heads/*:refs/sync/${name}/*`);
+  // --prune: branch apagada num repositório some daqui também (senão o sync a recriaria).
+  git('fetch', '--quiet', '--prune', url, `+refs/heads/*:refs/sync/${name}/*`);
   heads[name] = Object.fromEntries(
     git('for-each-ref', '--format=%(refname:lstrip=3) %(objectname)', `refs/sync/${name}/`)
       .split('\n')

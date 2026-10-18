@@ -25,6 +25,8 @@ O projeto existe em dois repositórios privados, mantidos iguais:
 Na máquina do mantenedor, `git push` envia para os dois de uma vez (o `origin` tem duas URLs de envio).
 De qualquer máquina, `npm run sync` traz o que houver de novo em um dos lados e atualiza o outro. Ele só
 avança o histórico (nunca força); se os dois divergiram, avisa e não mexe.
+Para apagar uma branch, apague nos dois repositórios: se ela continuar existindo num deles, o sync a
+recria no outro.
 
 Para configurar o envio duplo num clone novo:
 
