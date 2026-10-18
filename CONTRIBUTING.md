@@ -15,6 +15,24 @@ npm run dev     # jogo + painel de debug em http://localhost:5173
 npm run build   # precisa passar antes do PR (checagem de tipos + build)
 ```
 
+## Repositórios
+
+O projeto existe em dois repositórios privados, mantidos iguais:
+
+- `MatheusSaleh/supremo-motorista` (pessoal)
+- `nexolabs-dev/supremo-motorista` (organização)
+
+Na máquina do mantenedor, `git push` envia para os dois de uma vez (o `origin` tem duas URLs de envio).
+De qualquer máquina, `npm run sync` traz o que houver de novo em um dos lados e atualiza o outro. Ele só
+avança o histórico (nunca força); se os dois divergiram, avisa e não mexe.
+
+Para configurar o envio duplo num clone novo:
+
+```bash
+git remote set-url --add --push origin git@github.com:MatheusSaleh/supremo-motorista.git
+git remote set-url --add --push origin git@github.com:nexolabs-dev/supremo-motorista.git
+```
+
 ## Regras de conteúdo
 
 O jogo é uma sátira política **totalmente fictícia**. Pull requests que quebrem estas regras não são
