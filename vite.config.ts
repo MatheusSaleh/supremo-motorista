@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  // Caminhos relativos: o mesmo build roda na raiz (desktop, app://game/) e em subpastas (itch.io).
+  base: './',
   server: { open: false },
   build: {
     target: 'es2022',

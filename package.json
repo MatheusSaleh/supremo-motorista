@@ -14,7 +14,8 @@
     "dist:linux": "npm run build && electron-builder --linux",
     "dist:win": "npm run build && electron-builder --win",
     "dist:mac": "npm run build && electron-builder --mac",
-    "terrain": "node scripts/fetch-terrain.mjs"
+    "terrain": "node scripts/fetch-terrain.mjs",
+    "dist:web": "npm run build && node scripts/zip-web.mjs"
   },
   "devDependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",
@@ -32,7 +33,7 @@
   "main": "electron/main.cjs",
   "productName": "Supremo Motorista",
   "description": "Supremo Motorista — sátira arcade em Brasília",
-  "author": "Supremo Motorista",
+  "author": "Matheus Saleh",
   "build": {
     "appId": "br.supremomotorista.jogo",
     "productName": "Supremo Motorista",
@@ -76,5 +77,6 @@
     },
     "executableName": "supremo-motorista"
   },
-  "desktopName": "supremo-motorista.desktop"
+  "desktopName": "supremo-motorista.desktop",
+  "license": "SEE LICENSE IN LICENSE"
 }

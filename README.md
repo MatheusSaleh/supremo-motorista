@@ -46,6 +46,15 @@ npm run dist:win     # Windows (o instalador .exe precisa do Wine fora do Window
 A versão desktop pede a GPU dedicada, libera WebGPU e tem opções próprias no menu de pausa (tela cheia,
 FPS sem limite). Para depurar o build empacotado: `GAME_DEBUG=1` expõe `window.game` no console.
 
+### Web (itch.io)
+
+```bash
+npm run dist:web     # gera release/Supremo Motorista-<versão>-web.zip (index.html na raiz)
+```
+
+O build usa caminhos relativos e roda em qualquer subpasta. No itch.io, crie um projeto do tipo *HTML*,
+envie o zip marcado como *"This file will be played in the browser"* e ligue o botão de tela cheia.
+
 ### Outros scripts
 
 ```bash
@@ -115,4 +124,14 @@ Todos os modelos, sons e dados de terceiros, com autor, origem, licença e alter
 [CREDITS.md](CREDITS.md). Os modelos de carro e o personagem são CC BY 4.0 (exigem crédito); os sons são
 CC0; clima e relevo vêm do Open-Meteo (CC BY 4.0) e os feriados da BrasilAPI.
 
-Projeto privado. O código não tem licença de uso pública.
+### Licença
+
+| Parte | Licença |
+|---|---|
+| Código | [MIT](LICENSE): use, modifique e distribua à vontade, inclusive comercialmente |
+| Textos e conteúdo criativo (`src/data/i18n/`, roteiro, imagens de divulgação) | [CC BY-NC-SA 4.0](LICENSE-CONTEUDO.md): livre para uso não comercial, com crédito |
+| Nome "Supremo Motorista", logotipo e personagens | todos os direitos reservados ([detalhes](LICENSE-CONTEUDO.md)) |
+| Modelos, sons e dados de terceiros | a licença de cada autor ([CREDITS.md](CREDITS.md)) |
+
+Ou seja: o código pode ser reaproveitado em qualquer projeto, mas não dá para lançar uma cópia deste jogo
+com o mesmo nome e conteúdo. Quer contribuir? Veja o [CONTRIBUTING.md](CONTRIBUTING.md).
