@@ -25,6 +25,18 @@ export type CarEvent =
   | { type: 'impact'; strength: number; /** direção do obstáculo, no espaço do carro */ localDir: THREE.Vector3 }
   | { type: 'land'; airTime: number };
 
+/** Multiplicadores das melhorias da Oficina (Fase 11). */
+export interface CarMods {
+  engine: number;
+  speed: number;
+  grip: number;
+  turboRecharge: number;
+  turboForce: number;
+  stiffness: number;
+}
+
+const NO_MODS: CarMods = { engine: 1, speed: 1, grip: 1, turboRecharge: 1, turboForce: 1, stiffness: 1 };
+
 export const NO_CONTROLS: Readonly<CarControls> = { throttle: 0, steer: 0, handbrake: false, turbo: false };
 
 /** Altura dos pontos de fixação das rodas no espaço do chassi. */
@@ -50,6 +62,8 @@ export class Car {
   private gripMul = 1;
   /** Aderência do clima (1 = seco; pista molhada reduz). Ajustada pelo env/Atmosphere. */
   weatherGrip = 1;
+  /** Melhorias da Oficina (ver setMods). */
+  private mods: CarMods = NO_MODS;
   /** 0 = limpo … 1 = imundo (cada carro da frota tem a sua). */
   dirt = 0;
   /** Amassado desde a última passada na oficina. */
@@ -122,6 +136,12 @@ export class Car {
     this.reset(position, yaw);
   }
 
+  /** Melhorias da Oficina: valem a partir do próximo passo. */
+  setMods(mods: CarMods): void {
+    this.mods = mods;
+    this.applyWheelParams();
+  }
+
   /** Reaplica parâmetros de suspensão/atrito (chamado também pelo lil-gui). */
   applyWheelParams(): void {
     const c = this.p;
@@ -129,13 +149,13 @@ export class Car {
       const v = this.vehicle;
       v.setWheelRadius(i, c.wheelRadius);
       v.setWheelSuspensionRestLength(i, c.suspensionRest);
-      v.setWheelSuspensionStiffness(i, c.suspensionStiffness);
+      v.setWheelSuspensionStiffness(i, c.suspensionStiffness * this.mods.stiffness);
       v.setWheelSuspensionCompression(i, c.suspensionCompression);
       v.setWheelSuspensionRelaxation(i, c.suspensionRelaxation);
       v.setWheelMaxSuspensionTravel(i, c.maxSuspensionTravel);
       v.setWheelMaxSuspensionForce(i, c.mass * 60);
-      v.setWheelFrictionSlip(i, c.frictionSlip);
-      v.setWheelSideFrictionStiffness(i, c.sideFriction);
+      v.setWheelFrictionSlip(i, c.frictionSlip * this.mods.grip);
+      v.setWheelSideFrictionStiffness(i, c.sideFriction * this.mods.grip);
     }
   }
 
@@ -218,11 +238,12 @@ export class Car {
     const wantsTurbo = ctl.turbo && ctl.throttle > 0;
     if (!wantsTurbo || this.turbo <= 0) this.turboActive = false;
     else if (!this.turboActive && this.turbo >= c.turbo.minToStart) this.turboActive = true;
-    this.turbo = clamp(this.turbo + (this.turboActive ? -c.turbo.drainPerSec : c.turbo.rechargePerSec) * dt, 0, 1);
-    const forceMul = this.turboActive ? c.turbo.forceMul : 1;
-    const maxSpeed = c.maxSpeed * (this.turboActive ? c.turbo.maxSpeedMul : 1) * (this.offroad ? c.offroad.maxSpeedMul : 1);
-    // Aderência muda suavemente ao sair/entrar no asfalto.
-    this.gripMul += ((this.offroad ? c.offroad.grip : 1) * this.weatherGrip - this.gripMul) * damp(6, dt);
+    const m = this.mods;
+    this.turbo = clamp(this.turbo + (this.turboActive ? -c.turbo.drainPerSec : c.turbo.rechargePerSec * m.turboRecharge) * dt, 0, 1);
+    const forceMul = (this.turboActive ? c.turbo.forceMul * m.turboForce : 1) * m.engine;
+    const maxSpeed = c.maxSpeed * m.speed * (this.turboActive ? c.turbo.maxSpeedMul : 1) * (this.offroad ? c.offroad.maxSpeedMul : 1);
+    // Aderência muda suavemente ao sair/entrar no asfalto (pneus da Oficina incluídos).
+    this.gripMul += ((this.offroad ? c.offroad.grip : 1) * this.weatherGrip * m.grip - this.gripMul) * damp(6, dt);
 
     // Motor/freio. Acelerar contra o movimento freia primeiro; parado, troca de sentido.
     let engine = 0;

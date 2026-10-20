@@ -24,6 +24,8 @@ o humor do passageiro. É uma sátira; ninguém real aparece no jogo.
   o Novato medroso ou empolgado, a Presidente com pressa e o Discreto que não quer ser visto.
 - Fazer (ou recusar) "favores" para o banqueiro **Dr. Rubens Caixeta**: pagam muito, mas enchem o
   **Medidor de Suspeição**, atraem a imprensa e podem virar manchete e multa da Corregedoria.
+- Fazer carreira: expedientes com meta diária, contracheque, advertências, a **Oficina do Tribunal** para
+  melhorar a frota e comprar carros, e o progresso salvo automaticamente.
 - Jogar com o **clima, a hora e os feriados reais de Brasília**: chuva molha a pista e tira aderência, a
   noite acende postes, janelas e faróis, feriado dobra a gorjeta. O relevo também é o real.
 - Câmera interna com as mãos do motorista no volante, minimapa, controles de toque e versão desktop.
@@ -77,6 +79,7 @@ npm run terrain      # baixa de novo a elevação real (Open-Meteo) e regenera s
 | **Espaço** pular | **Espaço** freio de mão (drift) |
 | **E** entrar no carro | **Shift** turbo |
 | **Enter** atender o rádio | **H** buzina · **C** câmera interna |
+| **O** Oficina (na garagem) | **O** Oficina (parado na garagem) |
 | **Mouse** câmera | **E** sair · **R** reposicionar |
 | **Esc** pausar | **Enter** atender o rádio · **Esc** pausar |
 

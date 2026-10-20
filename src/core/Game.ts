@@ -26,6 +26,9 @@ import { Polarization } from '../factions/Polarization';
 import { Pursuers, type PursuitEvent } from '../factions/Pursuers';
 import { Suspicion } from '../factions/Suspicion';
 import { FAVORS, SUSPICION } from '../data/banker';
+import { Career, type ShiftEvent } from '../career/Career';
+import { CAR_PRICES, SHIFT, type UpgradeId } from '../data/career';
+import { CareerScreens } from '../hud/CareerScreens';
 import { RoadGraph } from '../world/RoadGraph';
 import { SeatedDriver } from '../player/SeatedDriver';
 import { World } from '../world/World';
@@ -79,6 +82,13 @@ export class Game {
   /** Fase 9: Medidor de Suspeição (favores do Dr. Caixeta, imprensa, Corregedoria). */
   readonly suspicion = new Suspicion();
   private suspicionWarned = false;
+  /** Fase 11: carreira (dias, Oficina, salvamento) e as telas dela. */
+  readonly career: Career;
+  private readonly careerScreens: CareerScreens;
+  /** Tela da carreira aberta (contracheque ou Oficina): a simulação para, sem abrir o menu de pausa. */
+  private modal: 'summary' | 'workshop' | null = null;
+  private saveTimer = 30;
+  private readonly onUnload = () => this.saveCareer();
   private immunityTimer = 0;
   private envTimer = 0;
   private envKey = '';
@@ -258,7 +268,7 @@ export class Game {
     this.input = new Input(this.renderer.domElement, c.usePointerLock && !touch);
     this.input.onPointerLockChange = (locked) => {
       // O navegador solta o pointer lock ao apertar Esc: tratamos como pausa.
-      if (!locked && !this.paused) this.setPaused(true);
+      if (!locked && !this.paused && !this.modal) this.setPaused(true);
     };
     this.cameraRig = new CameraRig(this.camera, cfg, () => this.world.cameraColliders);
     this.cameraRig.yaw = level.spawnYaw + Math.PI; // começa atrás do jogador
@@ -267,7 +277,7 @@ export class Game {
       hudRoot,
       level,
       this.settings,
-      { onResume: () => this.setPaused(false), onChange: (s) => this.applySettings(s) },
+      { onResume: () => this.setPaused(false), onChange: (s) => this.applySettings(s), onNewGame: () => this.newGame() },
       touch ? new TouchControls(this.input, () => this.setPaused(!this.paused)) : null,
       () => this.rides.accept(),
     );
@@ -288,13 +298,35 @@ export class Game {
       delivered: (f) => this.polarization.delivered(f),
       favorAccepted: () => this.suspicion.accepted(),
       favorDeclined: () => this.suspicion.declined(),
-      finished: ({ favor, toBank }) => {
+      finished: ({ favor, toBank, late }) => {
+        this.career.rideFinished(late, !!favor);
+        this.saveCareer();
         if (favor) this.suspicion.deliveredFavor();
         else this.suspicion.cleanRide();
         if (toBank && !favor) this.suspicion.cafezinho();
       },
     });
     this.rides.setVehicle(this.car);
+
+    // Carreira salva: dinheiro, suspeição, melhorias, carros e o expediente em andamento.
+    const loaded = Career.load();
+    this.career = loaded.career;
+    if (loaded.extras) {
+      this.rides.money = loaded.extras.money;
+      Object.assign(this.suspicion, loaded.extras.suspicion);
+    }
+    this.careerScreens = new CareerScreens(
+      hudRoot,
+      {
+        onContinue: () => this.startNextDay(),
+        onBuyUpgrade: (id) => this.buyUpgrade(id),
+        onBuyCar: (id) => this.buyCar(id),
+        onCloseWorkshop: () => this.closeModal(),
+      },
+      FLEET.map((d) => ({ id: d.id, nameKey: d.nameKey })),
+    );
+    this.applyCareer();
+    window.addEventListener('beforeunload', this.onUnload);
 
     window.addEventListener('resize', this.onResize);
     document.addEventListener('visibilitychange', this.onVisibility);
@@ -351,6 +383,7 @@ export class Game {
     if (paused) {
       this.pausedAt = performance.now();
       this.input.exitPointerLock();
+      this.refreshCareerTab();
     } else {
       this.accumulator = 0;
       // Chamado a partir de um clique/tecla (gesto do usuário); se falhar, arrastar ou clicar ainda funciona.
@@ -375,6 +408,7 @@ export class Game {
   dispose(): void {
     this.stop();
     window.removeEventListener('resize', this.onResize);
+    window.removeEventListener('beforeunload', this.onUnload);
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.input.dispose();
     this.hud.dispose();
@@ -401,12 +435,14 @@ export class Game {
 
     // Esc alterna a pausa. Ignora um Esc logo após pausar: ao sair do pointer lock o navegador
     // às vezes também entrega o keydown, o que despausaria imediatamente.
-    if (this.input.consumePressed('Escape')) {
+    if (this.modal) this.modalInput();
+    else if (this.input.consumePressed('Escape')) {
       if (!this.paused) this.setPaused(true);
       else if (performance.now() - this.pausedAt > 250) this.setPaused(false);
     }
 
-    if (!this.paused) this.simulate(dt);
+    if (!this.paused && !this.modal) this.simulate(dt);
+    this.careerScreens.updateBadge(this.career, this.rides.money);
     this.ambientAudio.update(this.camera.position, this.atmosphere.night, this.atmosphere.rainLevel);
     this.updateEnvironment(dt);
 
@@ -509,6 +545,7 @@ export class Game {
     for (const c of this.pursuers.active) this.carEffects.handleEvents(c.drainEvents(), c.model);
     this.updateFactions(dt, driving, pursuit);
     this.updateSuspicion(dt, carEvents);
+    this.updateCareer(dt, driving);
     this.carEffects.update(dt, this.car, this.car.model);
     this.car.model.updateInterior(this.car.steerAngle, this.car.speedKmh, this.carAudio.engineRpm);
     // Mãos no volante (IK): precisa das matrizes do carro já na posição deste frame.
@@ -574,6 +611,10 @@ export class Game {
   private tryEnterCar(): void {
     const car = this.nearbyCar();
     if (!car) return;
+    if (car.def && !this.career.owns(car.def.id)) {
+      this.showToast(this.lockedText(car.def.id, car.def.nameKey), 2.5, 'error');
+      return;
+    }
     this.switchCar(car);
     this.localPlayer.setEnabled(false);
     this.mode = 'driving';
@@ -661,6 +702,151 @@ export class Game {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Carreira (Fase 11)
+
+  private lockedText(id: string, nameKey: Parameters<typeof t>[0]): string {
+    return t('hud.prompt.locked', { name: t(nameKey), price: (CAR_PRICES[id] ?? 0).toLocaleString('pt-BR') });
+  }
+
+  /** Perto da garagem do Tribunal: a pé, ou parado dentro do carro. */
+  private atWorkshop(): boolean {
+    const garage = this.world.level?.addresses.find((a) => a.id === 'garagem');
+    if (!garage) return false;
+    const driving = this.mode === 'driving';
+    const p = driving ? this.car.position : this.localPlayer.position;
+    return Math.hypot(p.x - garage.x, p.z - garage.z) < 30 && (!driving || Math.abs(this.car.forwardSpeed) < 1);
+  }
+
+  /** Melhorias da Oficina em todos os carros da frota e no pagamento das multas. */
+  private applyCareer(): void {
+    const mods = this.career.carMods();
+    for (const c of this.cars) c.setMods(mods);
+    this.rides.penaltyMul = this.career.penaltyMul;
+  }
+
+  saveCareer(): void {
+    const s = this.suspicion;
+    this.career.save({
+      money: this.rides.money,
+      suspicion: { value: s.value, favorsAccepted: s.favorsAccepted, favorsDeclined: s.favorsDeclined, scandals: s.scandals },
+    });
+  }
+
+  /** Expediente: começo, aviso de fim, hora extra e fechamento do dia; Oficina na tecla O. */
+  private updateCareer(dt: number, driving: boolean): void {
+    const c = this.career;
+    this.rides.callsAllowed = c.started && !c.overtime;
+    const ev: ShiftEvent | null = c.update(dt, driving, this.rides.rideInProgress, this.rides.money);
+    if (ev === 'start') {
+      this.showToast(t('shift.start', { day: c.day, goal: c.goal.toLocaleString('pt-BR') }), 4, 'info');
+      this.saveCareer();
+    } else if (ev === 'warn') this.showToast(t('shift.warning'), 3, 'error');
+    else if (ev === 'overtime') this.showToast(t('shift.overtimeToast'), 4, 'info');
+    else if (ev === 'end') this.endShift();
+    if ((this.saveTimer -= dt) <= 0) {
+      this.saveTimer = 30;
+      this.saveCareer();
+    }
+    if (this.input.consumePressed('KeyO') && this.atWorkshop()) this.openModal('workshop');
+  }
+
+  private endShift(): void {
+    const summary = this.career.closeDay(this.rides.money);
+    this.rides.money = summary.balance;
+    this.saveCareer();
+    this.audio.play('uiConfirm');
+    this.careerScreens.showSummary(summary);
+    this.openModal('summary');
+  }
+
+  /** Começa o dia seguinte na garagem: frota no lugar e lavada, Josué ao lado, sem perseguições. */
+  private startNextDay(): void {
+    this.closeModal();
+    const level = this.world.level!;
+    if (this.mode === 'driving') {
+      this.car.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      this.tryExitCar();
+    }
+    const spots = level.fleetSpawns ?? [level.vehicleSpawn];
+    this.cars.forEach((c, i) => {
+      const spot = spots[i] ?? spots[0];
+      c.reset(spot.position, spot.yaw);
+      this.carEffects.repair(c);
+    });
+    this.localPlayer.teleport(level.spawn.x, level.spawn.y, level.spawn.z, level.spawnYaw);
+    this.cameraRig.yaw = level.spawnYaw + Math.PI;
+    this.pursuers.clear();
+    this.polarization.reset();
+    this.rides.resetForNewDay();
+    this.saveCareer();
+  }
+
+  private buyUpgrade(id: UpgradeId): void {
+    const price = this.career.buyUpgrade(id, this.rides.money);
+    if (price === null) return this.showToast(t('workshop.noMoney'), 1.6, 'error');
+    this.rides.money -= price;
+    this.applyCareer();
+    this.afterPurchase(t(`upgrade.${id}`));
+  }
+
+  private buyCar(id: string): void {
+    const price = this.career.buyCar(id, this.rides.money);
+    if (price === null) return this.showToast(t('workshop.noMoney'), 1.6, 'error');
+    this.rides.money -= price;
+    const def = FLEET.find((d) => d.id === id);
+    this.afterPurchase(def ? t(def.nameKey) : id);
+  }
+
+  private afterPurchase(name: string): void {
+    this.audio.play('uiConfirm');
+    this.showToast(t('workshop.bought', { name }), 2, 'info');
+    this.saveCareer();
+    this.careerScreens.showWorkshop(this.career, this.rides.money);
+  }
+
+  private openModal(kind: 'summary' | 'workshop'): void {
+    this.modal = kind;
+    this.input.reset();
+    this.input.exitPointerLock();
+    this.audio.setDucked(true);
+    if (kind === 'workshop') this.careerScreens.showWorkshop(this.career, this.rides.money);
+  }
+
+  private closeModal(): void {
+    this.careerScreens.hideSummary();
+    this.careerScreens.hideWorkshop();
+    this.modal = null;
+    this.accumulator = 0;
+    this.input.reset();
+    this.audio.setDucked(false);
+    this.input.requestPointerLock();
+  }
+
+  /** Teclado nas telas da carreira: Enter continua o dia; Esc/O fecham a Oficina. */
+  private modalInput(): void {
+    const i = this.input;
+    if (this.modal === 'summary' && (i.consumePressed('Enter') || i.consumePressed('NumpadEnter'))) this.startNextDay();
+    else if (this.modal === 'workshop' && (i.consumePressed('Escape') || i.consumePressed('KeyO'))) this.closeModal();
+  }
+
+  private refreshCareerTab(): void {
+    const c = this.career;
+    const s = this.suspicion;
+    this.hud.pauseMenu.setCareer([
+      t('career.day', { day: c.day }),
+      t('career.balance', { value: Math.round(this.rides.money).toLocaleString('pt-BR') }),
+      t('career.warnings', { n: c.warnings, max: SHIFT.maxWarnings }),
+      t('career.stats', { rides: c.totals.rides, favors: s.favorsAccepted, declined: s.favorsDeclined, scandals: s.scandals }),
+    ]);
+  }
+
+  private newGame(): void {
+    window.removeEventListener('beforeunload', this.onUnload);
+    Career.wipe();
+    location.reload();
+  }
+
   /** Imprensa (Fase 9): avisos e fotos (que alimentam a suspeição). */
   private handlePress(type: PursuitEvent['type']): void {
     if (type === 'spawn') {
@@ -669,7 +855,7 @@ export class Game {
       this.showToast(t('toast.press.escape'), 3, 'info');
     } else if (type === 'photo') {
       const favor = this.rides.favorAboard !== null;
-      this.suspicion.photographed(favor);
+      this.suspicion.photographed(favor, this.career.photoMul);
       this.rides.photographed();
       if (favor) this.showToast(t('toast.press.photo'), 1.5, 'error');
     }
@@ -695,6 +881,7 @@ export class Game {
     this.suspicionWarned = warned;
     if (!sus.full) return;
     const fine = sus.scandal(this.rides.money);
+    this.career.scandal();
     const maleta = this.rides.scandal(fine, SUSPICION.scandalQuiet);
     this.pursuers.clear();
     this.audio.play('uiError');
@@ -884,8 +1071,10 @@ export class Game {
     this.toast = null;
     if (this.mode === 'onFoot' && !this.paused) {
       const car = this.nearbyCar();
+      if (car?.def && !this.career.owns(car.def.id)) return { text: this.lockedText(car.def.id, car.def.nameKey) };
       if (car) return { key: 'E', text: car.def ? t('hud.prompt.enterNamed', { name: t(car.def.nameKey) }) : t('hud.prompt.enterCar') };
     }
+    if (!this.paused && this.atWorkshop()) return { key: 'O', text: t('hud.prompt.workshop') };
     return null;
   }
 

@@ -921,3 +921,152 @@ kbd {
     bottom: 212px;
   }
 }
+
+/* ---------- Carreira (Fase 11) ---------- */
+
+.career-badge {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  max-width: 220px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--hud-bg);
+  font: 600 13px system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.career-badge.urgent {
+  box-shadow: 0 0 0 2px #ff5a3d;
+}
+
+.career-goal {
+  margin-top: 2px;
+  opacity: 0.85;
+}
+
+.career-goal.ok {
+  color: #8dffb0;
+  opacity: 1;
+}
+
+.career-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(10 14 20 / 0.55);
+  backdrop-filter: blur(3px);
+  pointer-events: auto;
+}
+
+.career-overlay[hidden] {
+  display: none;
+}
+
+.career-panel {
+  box-sizing: border-box;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 22px 24px;
+  border: 1px solid var(--hud-border);
+  border-radius: 14px;
+  background: rgb(16 22 30 / 0.95);
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.4);
+}
+
+.career-panel.wide {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.career-panel h2 {
+  margin: 0 0 10px;
+  font-size: 21px;
+}
+
+.career-panel h3 {
+  margin: 16px 0 6px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.75;
+}
+
+.career-panel .row {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+}
+
+.career-panel .row.total {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--hud-border);
+  font-weight: 800;
+  font-size: 17px;
+}
+
+.career-panel .pos {
+  color: #8dffb0;
+}
+
+.career-panel .neg {
+  color: #ff8a7a;
+}
+
+.career-panel > button {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.career-verdict.ok {
+  color: #8dffb0;
+}
+
+.career-verdict.bad {
+  color: #ff8a7a;
+  font-weight: 700;
+}
+
+.career-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.career-balance {
+  color: #8dffb0;
+  font-weight: 800;
+}
+
+.career-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgb(255 255 255 / 0.08);
+}
+
+.career-item > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.career-item button {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 150px;
+  padding: 8px 12px;
+}
+
+.career-item small {
+  opacity: 0.75;
+}
+
+#hud.touch .career-badge {
+  bottom: auto;
+  top: 56px;
+}

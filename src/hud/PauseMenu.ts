@@ -7,6 +7,8 @@ import { CONTROL_HINTS, keyLabel, type HudMode } from './controls';
 export interface PauseMenuCallbacks {
   onResume: () => void;
   onChange: (settings: Settings) => void;
+  /** Fase 11: apagar o progresso e começar do dia 1. */
+  onNewGame?: () => void;
 }
 
 const DRAW_DISTANCES: [number, 'pause.draw.short' | 'pause.draw.medium' | 'pause.draw.long' | 'pause.draw.max'][] = [
@@ -40,6 +42,7 @@ export class PauseMenu {
   private readonly realWorld: HTMLInputElement;
   private readonly draw: HTMLSelectElement;
   private readonly muted: HTMLInputElement;
+  private readonly careerInfo: HTMLElement;
   private readonly volumeInputs: HTMLInputElement[];
 
   constructor(
@@ -59,6 +62,7 @@ export class PauseMenu {
           <button type="button" role="tab" data-tab="graphics" aria-selected="true">${t('pause.graphics')}</button>
           <button type="button" role="tab" data-tab="audio" aria-selected="false">${t('pause.audio')}</button>
           <button type="button" role="tab" data-tab="controls" aria-selected="false">${t('pause.controls')}</button>
+          <button type="button" role="tab" data-tab="career" aria-selected="false">${t('pause.career')}</button>
         </div>
         <section data-panel="graphics">
           <label>${t('pause.quality')}
@@ -101,6 +105,10 @@ export class PauseMenu {
             .join('')}
           <label class="hud-check"><input type="checkbox" data-ref="muted" /> ${t('pause.audio.muted')}</label>
         </section>
+        <section data-panel="career" hidden>
+          <div data-ref="careerInfo"></div>
+          <button type="button" class="hud-secondary" data-ref="newGame">${t('career.reset')}</button>
+        </section>
         <section data-panel="controls" class="hud-controls-grid" hidden>
           <div><h3>${t('pause.controls.onFoot')}</h3><ul class="hud-keys">${controlsList('onFoot')}</ul></div>
           <div><h3>${t('pause.controls.driving')}</h3><ul class="hud-keys">${controlsList('driving')}</ul></div>
@@ -120,6 +128,10 @@ export class PauseMenu {
     this.draw.addEventListener('change', () => this.update({ quality: 'personalizada', drawDistance: Number(this.draw.value) }));
     if (desktop) this.setupDesktop(q);
     this.muted = q('muted');
+    this.careerInfo = q('careerInfo');
+    q('newGame').addEventListener('click', () => {
+      if (window.confirm(t('career.resetConfirm'))) this.cb.onNewGame?.();
+    });
     this.volumeInputs = [...el.querySelectorAll<HTMLInputElement>('[data-vol]')];
     for (const input of this.volumeInputs) {
       input.addEventListener('input', () => {
@@ -183,6 +195,11 @@ export class PauseMenu {
     void d.gpuInfo().then((info) => {
       q('gpu').textContent = t('pause.desktop.gpu', { gpu: webglRendererName(), webgpu: info.webgpu.startsWith('enabled') ? '✓' : '✗' });
     });
+  }
+
+  /** Linhas da aba Carreira (texto pronto). */
+  setCareer(lines: string[]): void {
+    this.careerInfo.innerHTML = lines.map((l) => `<p>${l}</p>`).join('');
   }
 
   private update(patch: Partial<Settings>): void {

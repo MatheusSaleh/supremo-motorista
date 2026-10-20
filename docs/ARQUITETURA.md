@@ -212,6 +212,20 @@ em [ASSETS.md](ASSETS.md).
   com menor desvio, e vira o alvo até ser cumprida.
 - Regras e valores ficam em `ARCHETYPE_RULES`; as áreas movimentadas, em `BUSY_AREAS`.
 
+## Carreira (`src/career/Career.ts`, `src/data/career.ts`, `src/hud/CareerScreens.ts`)
+
+- **`Career`:** dia, advertências, melhorias, carros comprados, totais e o expediente atual (tempo, hora
+  extra, dinheiro no início do dia, estatísticas). Salva e carrega no `localStorage` (`supremo.save.v1`); o
+  dinheiro e a suspeição entram pelo `SaveExtras`.
+  - `update()` devolve os eventos do expediente (`start`, `warn`, `overtime`, `end`).
+  - `closeDay()` monta o contracheque e passa para o dia seguinte.
+  - O faturamento do dia é o dinheiro atual menos `dayStartMoney`. Compras e dinheiro de debug movem essa
+    referência (`adjustBaseline`), para não contar na meta.
+- **Melhorias:** viram multiplicadores (`carMods()`) aplicados por `Car.setMods`, mais o seguro
+  (`RideManager.penaltyMul`) e a película (fator das fotos na suspeição).
+- **Telas no `Game`:** o contracheque e a Oficina são "modais". Com um aberto, a simulação para, o pointer
+  lock é solto sem abrir o menu de pausa e o teclado vai para `modalInput()`.
+
 ## Ambiente real (`src/env/`)
 
 | Arquivo | Papel |

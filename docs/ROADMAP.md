@@ -19,8 +19,8 @@ precisa passar.
 | 8 | Perseguidores e polarização | ✅ concluída |
 | 9 | O banqueiro e o Medidor de Suspeição | ✅ concluída |
 | 10 | Arquétipos de passageiros | ✅ concluída |
-| 11 | Expediente, sessão, melhorias e salvamento | ⏳ próxima |
-| 12 | Campanha, finais, menus e áudio | ⏳ |
+| 11 | Expediente, sessão, melhorias e salvamento | ✅ concluída |
+| 12 | Campanha, finais, menus e áudio | ⏳ próxima |
 
 ---
 
@@ -146,6 +146,36 @@ falas e a conta:
 - O painel da corrida mostra a situação: discurso em andamento, parada exigida, exposição…
 - **Debug:** a pasta "Passageiros" do painel força o próximo passageiro e chama o rádio na hora.
 
+### Fase 11 — Expediente, sessão, melhorias e salvamento
+- **Expediente:** cada dia de trabalho dura 8 minutos de jogo e começa quando Josué pega um carro.
+  - **Meta:** R$ 900 no dia 1, mais R$ 300 por dia, até R$ 3.000.
+  - **No fim:** sem corrida em andamento, o dia fecha. Com corrida, vira "hora extra" até ela terminar.
+  - **Rádio:** só chama durante o expediente.
+  - **Selo:** no canto da tela, com o dia, o tempo e a meta.
+- **Contracheque:** mostra o faturamento do dia, a diária fixa (R$ 200), o auxílio-paletó (R$ 150, se bateu a
+  meta) e o bônus de produtividade (R$ 250, com 50% acima da meta).
+  - Abaixo da meta, o dia registra uma advertência. Com 3, a demissão fica "iminente" (a consequência
+    vem com a campanha, na Fase 12).
+  - O dia seguinte começa na garagem, com a frota lavada e sem perseguições.
+- **Oficina do Tribunal** (tecla **O** na garagem): as melhorias valem para toda a frota.
+
+  | Melhoria | Efeito por nível |
+  |---|---|
+  | Motor recalibrado (3 níveis) | +10% força, +4% velocidade |
+  | Pneus de comitiva (3) | +8% aderência |
+  | Turbo de urgência (3) | +25% recarga, +8% força |
+  | Suspensão reforçada (2) | +12% rigidez |
+  | Seguro "patrimônio público" (3) | −25% nas multas |
+  | Película escura (2) | −30% de suspeição nas fotos |
+
+  Os carros também têm preço: Fusão e Corolinha vêm liberados; Equinócio custa R$ 1.500, SW-Quatro R$ 2.500 e
+  Lexo R$ 6.000 ("licitação emergencial"). Compras não contam contra a meta do dia.
+- **Salvamento automático no navegador:** guarda dia, dinheiro, advertências, melhorias, carros, suspeição, o
+  histórico de favores e escândalos e o expediente em andamento. Salva a cada 30 s, a cada corrida, nas
+  compras, no fim do dia e ao fechar a página.
+- **Menu de pausa:** a aba **Carreira** mostra as estatísticas e permite começar um jogo novo.
+- **Debug:** a pasta "Carreira" do painel encerra o expediente, dá dinheiro, libera os carros e salva na hora.
+
 ### Extras feitos entre as fases
 - **Sons (todos CC0):**
   - motor que varia com a rotação e cantada de pneu sintetizada;
@@ -191,11 +221,6 @@ falas e a conta:
 ---
 
 ## O que falta
-
-### Fase 11 — Expediente, sessão, melhorias e salvamento ⏳
-- **Expedientes (turnos):** metas, horário (a hora real já está pronta) e um resumo no fim.
-- **Melhorias da frota** com o dinheiro ganho (motor, suspensão, pneus, turbo) e liberação de carros.
-- **Salvamento** do progresso (dinheiro, carros, medidores, campanha).
 
 ### Fase 12 — Campanha, finais, menus e áudio ⏳
 - Campanha com **três finais**, decididos pela polarização e pela suspeição.

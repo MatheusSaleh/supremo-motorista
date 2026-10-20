@@ -137,6 +137,9 @@ export class RideManager {
   private conditions: RideConditions = { holiday: false, holidayEve: false, rain: false, dry: false, night: false };
   /** A próxima oferta pode ser um favor (decidido pelo Game, que conhece a suspeição). */
   favorsAllowed = true;
+  /** Fase 11: o rádio só chama durante o expediente; multas reduzidas pelo seguro da Oficina. */
+  callsAllowed = true;
+  penaltyMul = 1;
   private forceFavor = false;
   /** Debug: id do passageiro da próxima corrida comum (null = sorteio). */
   forcedPassenger: string | null = null;
@@ -182,6 +185,24 @@ export class RideManager {
     if (this.phase !== 'idle' && this.phase !== 'offered' && this.phase !== 'result') return;
     this.forceFavor = true;
     this.offer(carPos);
+  }
+
+  /** Novo dia (Fase 11): sem corrida, sem passageiro, rádio chama logo no começo do expediente. */
+  resetForNewDay(): void {
+    this.npc?.hide();
+    this.maleta.hide();
+    if (this.rearPassenger) this.rearPassenger.visible = false;
+    this.beacon.hide();
+    this.ride = null;
+    this.result = null;
+    this.bubble = null;
+    this.phase = 'idle';
+    this.timer = T.firstCallDelay;
+  }
+
+  /** Corrida em andamento (atendida e não terminada). */
+  get rideInProgress(): boolean {
+    return this.phase === 'toPickup' || this.phase === 'toDropoff';
   }
 
   /** Debug: novo chamado agora (comum, com o passageiro forçado, se houver). */
@@ -260,7 +281,7 @@ export class RideManager {
 
     switch (this.phase) {
       case 'idle':
-        if (this.everDrove && (this.timer -= f.dt) <= 0) this.offer(f.carPos);
+        if (this.everDrove && this.callsAllowed && (this.timer -= f.dt) <= 0) this.offer(f.carPos);
         break;
       case 'offered':
         if ((this.timer -= f.dt) <= 0) {
@@ -613,9 +634,9 @@ export class RideManager {
     if (extra > 0) add('result.thrilled', (s.jumps * P.jumpBonus + s.driftTime * P.driftBonusPerSecond) * extra);
     r.quirk.result(add, late, late ? 0 : r.timeLeft * P.tipPerSecond);
     if (r.stop?.done) add('result.lecture', ARCHETYPE_RULES.palestrante.stopBonus);
-    add('result.crashes', -s.crashes * P.crashPenalty, { n: s.crashes });
-    add('result.props', -s.props * P.propPenalty, { n: s.props });
-    if (s.lake) add('result.lake', -P.lakePenalty);
+    add('result.crashes', -s.crashes * P.crashPenalty * this.penaltyMul, { n: s.crashes });
+    add('result.props', -s.props * P.propPenalty * this.penaltyMul, { n: s.props });
+    if (s.lake) add('result.lake', -P.lakePenalty * this.penaltyMul);
     add('result.escape', s.escapes * PURSUIT.escapeBonus, { n: s.escapes });
     const total = lines.reduce((sum, l) => sum + l.value, 0);
     this.money += total;

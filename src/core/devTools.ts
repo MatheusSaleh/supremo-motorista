@@ -78,6 +78,14 @@ export function setupDevTools(game: Game): () => void {
   pa.add({ call: () => game.rides.offerNow(game.car.position) }, 'call').name('chamado do rádio agora');
   pa.close();
 
+  // Carreira (Fase 11): acelera os testes do expediente, da Oficina e do salvamento.
+  const ca = gui.addFolder('Carreira');
+  ca.add({ end: () => Object.assign(game.career, { started: true, timeLeft: 1 }) }, 'end').name('encerrar o expediente agora');
+  ca.add({ cash: () => ((game.rides.money += 5000), game.career.adjustBaseline(5000)) }, 'cash').name('+ R$ 5.000');
+  ca.add({ unlock: () => { for (const id of ['equinocio', 'sw4', 'lexo']) game.career.cars.add(id); } }, 'unlock').name('liberar todos os carros');
+  ca.add({ save: () => game.saveCareer() }, 'save').name('salvar agora');
+  ca.close();
+
   const a = gui.addFolder('Animação');
   a.add(game.localPlayer.avatar, 'showCollider').name('mostrar colisor');
   a.add(cfg.character, 'fadeTime', 0, 1, 0.01).name('crossfade (s)');

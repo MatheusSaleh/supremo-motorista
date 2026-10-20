@@ -42,8 +42,8 @@ export class Suspicion {
   }
 
   /** Foto da imprensa: flagrante (favor a bordo) pesa muito mais. */
-  photographed(favorAboard: boolean): void {
-    this.add(favorAboard ? S.photoFavor : S.photoClean);
+  photographed(favorAboard: boolean, mul = 1): void {
+    this.add((favorAboard ? S.photoFavor : S.photoClean) * mul);
   }
 
   /** Carros da imprensa desejados agora. */
