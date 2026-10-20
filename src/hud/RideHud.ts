@@ -53,6 +53,7 @@ export class RideHud {
     // Rádio.
     this.radio.hidden = !v.offer;
     if (v.offer) {
+      this.radio.classList.toggle('favor', v.offer.favor);
       const key = v.offer.text + v.offer.route;
       if (key !== this.lastKey) {
         this.lastKey = key;

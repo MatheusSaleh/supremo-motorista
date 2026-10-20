@@ -31,7 +31,14 @@ export interface HudFrame {
   /** Clima e hora de Brasília ("☀ 27°C · 55% · 14:00") e selo de feriado. */
   env?: { text: string; badge: string | null };
   /** Polarização (calor por facção), território atual e perseguidores em cena. */
-  polar?: { heat: Readonly<Record<FactionId, number>>; territory: { text: string; color: string } | null; pursuers: number };
+  polar?: {
+    heat: Readonly<Record<FactionId, number>>;
+    territory: { text: string; color: string } | null;
+    pursuers: number;
+    /** Fase 9: Medidor de Suspeição (0–100) e carros da imprensa em cena. */
+    suspicion: number;
+    press: number;
+  };
 }
 
 export class Hud {
@@ -50,6 +57,10 @@ export class Hud {
   private readonly pursuersLabel: HTMLElement;
   private readonly territoryLabel: HTMLElement;
   private lastPolar = '';
+  private readonly suspicionBar: HTMLElement;
+  private readonly pressLabel: HTMLElement;
+  private readonly headline: HTMLElement;
+  private headlineTimer = 0;
   private readonly carPanel: HTMLElement;
   private readonly speed: HTMLElement;
   private readonly turboBar: HTMLElement;
@@ -77,10 +88,18 @@ export class Hud {
           <div class="hud-polar-title">${t('hud.polarization')}</div>
           ${FACTION_IDS.map((f) => `<div class="hud-polar-row"><span>${t(FACTIONS[f].nameKey)}</span><div class="hud-polar-track"><div class="hud-polar-bar" data-polar="${f}" style="background:${FACTIONS[f].css}"></div></div></div>`).join('')}
           <div class="hud-polar-pursuers" data-ref="pursuers" hidden></div>
+          <div class="hud-polar-title hud-suspicion-title">${t('hud.suspicion')}</div>
+          <div class="hud-polar-track hud-suspicion-track"><div class="hud-polar-bar hud-suspicion-bar" data-ref="suspicion"></div></div>
+          <div class="hud-polar-pursuers" data-ref="press" hidden>${t('hud.press')}</div>
         </div>
         <span class="hud-territory" data-ref="territory" hidden></span>
       </div>
       <div class="hud-controls" data-ref="controls"></div>
+      <div class="hud-headline" data-ref="headline" hidden>
+        <div class="hud-headline-paper" data-ref="hlPaper"></div>
+        <div class="hud-headline-title" data-ref="hlTitle"></div>
+        <div class="hud-headline-sub" data-ref="hlSub"></div>
+      </div>
       <div class="hud-car" data-ref="car" hidden>
         <div class="hud-speed"><span data-ref="speed">0</span><small>${t('hud.speedUnit')}</small></div>
         <div class="hud-turbo">
@@ -95,6 +114,9 @@ export class Hud {
     this.envText = q('envText');
     this.envBadge = q('envBadge');
     this.polarBox = q('polar');
+    this.suspicionBar = q('suspicion');
+    this.pressLabel = q('press');
+    this.headline = q('headline');
     this.pursuersLabel = q('pursuers');
     this.territoryLabel = q('territory');
     this.polarBars = FACTION_IDS.map((f) => [f, root.querySelector<HTMLElement>(`[data-polar="${f}"]`)!]);
@@ -114,6 +136,15 @@ export class Hud {
     this.pauseMenu = new PauseMenu(settings, callbacks);
     root.appendChild(this.pauseMenu.element);
     window.addEventListener('resize', this.onResize);
+  }
+
+  /** Manchete de jornal (fictício) no meio da tela por alguns segundos (escândalo da Fase 9). */
+  showHeadline(paper: string, title: string, sub: string, seconds = 8): void {
+    this.root.querySelector<HTMLElement>('[data-ref="hlPaper"]')!.textContent = paper;
+    this.root.querySelector<HTMLElement>('[data-ref="hlTitle"]')!.textContent = title;
+    this.root.querySelector<HTMLElement>('[data-ref="hlSub"]')!.textContent = sub;
+    this.headline.hidden = false;
+    this.headlineTimer = seconds;
   }
 
   setMinimapImage(image: HTMLCanvasElement): void {
@@ -160,11 +191,14 @@ export class Hud {
 
     if (f.polar) {
       const p = f.polar;
-      const key = `${FACTION_IDS.map((id) => Math.round(p.heat[id])).join()}|${p.territory?.text}|${p.pursuers}`;
+      const key = `${FACTION_IDS.map((id) => Math.round(p.heat[id])).join()}|${p.territory?.text}|${p.pursuers}|${Math.round(p.suspicion)}|${p.press}`;
       if (key !== this.lastPolar) {
         this.lastPolar = key;
         for (const [id, bar] of this.polarBars) bar.style.width = `${Math.round(p.heat[id])}%`;
-        this.polarBox.classList.toggle('hot', p.pursuers > 0);
+        this.polarBox.classList.toggle('hot', p.pursuers + p.press > 0);
+        this.suspicionBar.style.width = `${Math.round(p.suspicion)}%`;
+        this.suspicionBar.classList.toggle('danger', p.suspicion >= 70);
+        this.pressLabel.hidden = p.press === 0;
         this.pursuersLabel.hidden = p.pursuers === 0;
         this.pursuersLabel.textContent = t('hud.pursuers', { n: p.pursuers });
         this.territoryLabel.hidden = !p.territory;
@@ -174,6 +208,8 @@ export class Hud {
         }
       }
     }
+
+    if (this.headlineTimer > 0 && (this.headlineTimer -= f.dt) <= 0) this.headline.hidden = true;
 
     this.carPanel.hidden = !f.car;
     if (f.car) {

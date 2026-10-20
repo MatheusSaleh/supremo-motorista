@@ -20,6 +20,8 @@ o humor do passageiro. É uma sátira; ninguém real aparece no jogo.
   tesourinhas e superquadras, Rodoviária e feira, aeroporto, Ponte JK e outros marcos.
 - Fugir dos **Vermelhos** e dos **Amarelos**, facções fictícias que perseguem o carro oficial pelas ruas
   (com tomates) quando a polarização esquenta nos territórios deles.
+- Fazer (ou recusar) "favores" para o banqueiro **Dr. Rubens Caixeta**: pagam muito, mas enchem o
+  **Medidor de Suspeição**, atraem a imprensa e podem virar manchete e multa da Corregedoria.
 - Jogar com o **clima, a hora e os feriados reais de Brasília**: chuva molha a pista e tira aderência, a
   noite acende postes, janelas e faróis, feriado dobra a gorjeta. O relevo também é o real.
 - Câmera interna com as mãos do motorista no volante, minimapa, controles de toque e versão desktop.

@@ -204,6 +204,68 @@ body {
   font-weight: 800;
 }
 
+.hud-suspicion-title {
+  margin-top: 6px;
+}
+
+.hud-suspicion-bar {
+  background: #ff9f43;
+}
+
+.hud-suspicion-bar.danger {
+  background: #ff4d4d;
+  animation: hud-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes hud-pulse {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.hud-headline {
+  position: absolute;
+  top: 22%;
+  left: 50%;
+  width: min(560px, 90vw);
+  transform: translateX(-50%) rotate(-1.5deg);
+  padding: 14px 20px 16px;
+  border: 3px double #222;
+  background: #f4efe1;
+  color: #1c1c1c;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.45);
+  font-family: Georgia, 'Times New Roman', serif;
+  text-align: center;
+  pointer-events: none;
+}
+
+.hud-headline-paper {
+  padding-bottom: 6px;
+  border-bottom: 2px solid #222;
+  font: 700 12px system-ui, sans-serif;
+  letter-spacing: 0.12em;
+}
+
+.hud-headline-title {
+  margin: 10px 0 8px;
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.hud-headline-sub {
+  font-size: 15px;
+  font-style: italic;
+}
+
+.ride-radio.favor {
+  border-color: #3ddc84;
+  background: rgb(10 40 26 / 0.92);
+}
+
 .hud-territory {
   padding: 3px 10px;
   border-radius: 8px;

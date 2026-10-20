@@ -1,3 +1,4 @@
+import { bankerPtBR } from './pt-BR.banker';
 import { environmentPtBR } from './pt-BR.environment';
 import { factionsPtBR } from './pt-BR.factions';
 import { ridesPtBR } from './pt-BR.rides';
@@ -12,6 +13,7 @@ export const ptBR = {
   ...vehiclesPtBR,
   ...environmentPtBR,
   ...factionsPtBR,
+  ...bankerPtBR,
   'game.title': 'Supremo Motorista',
   'game.subtitle': 'Transporte Oficial do Tribunal',
 

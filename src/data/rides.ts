@@ -4,10 +4,11 @@
 // Regra de conteúdo: corridas só usam endereços dos pools abaixo (setores fictícios). Marcos reais
 // (TST, PGR, PF, QG, Planalto, Catedral…) são só cenário e NUNCA entram como origem ou destino.
 import type { StringKey } from '../core/i18n';
+import type { FavorKind } from './banker';
 import type { FactionId } from './factions';
 
 /** Arquétipos (comportamentos próprios chegam na Fase 10). */
-export type Archetype = 'orador' | 'palestrante' | 'novato' | 'presidente' | 'discreto';
+export type Archetype = 'orador' | 'palestrante' | 'novato' | 'presidente' | 'discreto' | 'banqueiro';
 
 export interface Passenger {
   id: string;
@@ -23,6 +24,8 @@ export const PASSENGERS: Passenger[] = [
   { id: 'anselmo', nameKey: 'passenger.anselmo', archetype: 'novato', faction: null },
   { id: 'dulce', nameKey: 'passenger.dulce', archetype: 'presidente', faction: 'amarelos' },
   { id: 'euclides', nameKey: 'passenger.euclides', archetype: 'discreto', faction: 'vermelhos' },
+  // Só nos favores (Fase 9): nunca aparece nas corridas comuns.
+  { id: 'caixeta', nameKey: 'passenger.caixeta', archetype: 'banqueiro', faction: null },
 ];
 
 /** Pools de endereços (prefixos de id de AddressPoint). */
@@ -48,6 +51,10 @@ export interface RideTemplate {
   /** Passageiros possíveis (vazio = qualquer um). */
   passengers?: string[];
   weight?: number;
+  /** Favor do Dr. Caixeta (Fase 9): oferecido pelo celular, paga "consultoria" e aumenta a suspeição. */
+  favor?: FavorKind;
+  /** Distância máxima própria (m), no lugar de RIDE_TIMING.maxDistance. */
+  maxDistance?: number;
 }
 
 export const RIDES: RideTemplate[] = [
@@ -60,6 +67,9 @@ export const RIDES: RideTemplate[] = [
   { id: 'casa', from: ['tribunal', 'esplanada'], to: ['quadras', 'mansoes'], reasonKey: 'ride.reason.casa', weight: 2 },
   // O Banco Confiança é fictício; o Dr. Rubens Caixeta entra na Fase 9.
   { id: 'cafezinho', from: ['tribunal', 'esplanada'], to: ['banco'], reasonKey: 'ride.reason.cafezinho', weight: 1 },
+  // Favores do Dr. Caixeta (Fase 9). A maleta vai sozinha no banco de trás.
+  { id: 'favor-carona', from: ['banco'], to: ['tribunal', 'mansoes', 'orla'], reasonKey: 'favor.reason.carona', passengers: ['caixeta'], favor: 'carona', maxDistance: 3600 },
+  { id: 'favor-maleta', from: ['banco'], to: ['mansoes', 'orla', 'quadras'], reasonKey: 'favor.reason.maleta', passengers: ['caixeta'], favor: 'maleta', maxDistance: 3600 },
 ];
 
 /** Tempo e distância. */
@@ -135,7 +145,9 @@ export type LineTrigger =
   | 'tomato'
   | 'escape'
   | 'hostile'
-  | 'friendly';
+  | 'friendly'
+  // Imprensa (Fase 9).
+  | 'photo';
 
 /** Quantas variações de cada fala existem no i18n (chaves line.<gatilho>.<n>). */
 export const LINE_COUNTS: Record<LineTrigger, number> = {
@@ -160,4 +172,5 @@ export const LINE_COUNTS: Record<LineTrigger, number> = {
   escape: 3,
   hostile: 3,
   friendly: 2,
+  photo: 3,
 };

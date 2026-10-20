@@ -15,15 +15,22 @@ import { FLEET, type VehicleDef } from '../data/vehicles';
 import { Car, type CarControls } from '../vehicle/Car';
 import type { CarEffects } from '../vehicle/CarEffects';
 import type { CarAsset } from '../vehicle/CarVisual';
-import { factionFlagMaterial } from '../world/city/materials';
+import { factionFlagMaterial, flagMaterial } from '../world/city/materials';
+import { t } from '../core/i18n';
+import { PRESS } from '../data/banker';
 import type { RoadGraph, RoadNode } from '../world/RoadGraph';
 import type { World } from '../world/World';
 import type { Polarization } from './Polarization';
 
+/** Quem dirige o carro do pool: uma facção ou a imprensa (Fase 9). */
+export type PursuerSide = FactionId | 'imprensa';
+
 export type PursuitEvent =
-  | { type: 'spawn'; faction: FactionId }
+  | { type: 'spawn'; faction: PursuerSide }
   /** Desistiu por ter ficado longe (o jogador despistou). */
-  | { type: 'escape'; faction: FactionId }
+  | { type: 'escape'; faction: PursuerSide }
+  /** A imprensa tirou uma foto do carro oficial. */
+  | { type: 'photo'; faction: 'imprensa' }
   | { type: 'tomato'; faction: FactionId }
   /** Encostou forte no carro oficial. */
   | { type: 'ram'; faction: FactionId };
@@ -32,7 +39,7 @@ export type PursuitEvent =
 const PARK = { x: 0, y: -400, z: 0 };
 
 class Pursuer {
-  faction: FactionId | null = null;
+  side: PursuerSide | null = null;
   readonly controls: CarControls = { throttle: 0, steer: 0, handbrake: false, turbo: false };
   path: RoadNode[] = [];
   idx = 0;
@@ -48,10 +55,14 @@ class Pursuer {
   touching = false;
   /** Sobrando (a facção esfriou): para de perseguir e sai de cena. */
   leaving = 0;
+  /** Imprensa: intervalo das fotos e o brilho do flash. */
+  photo = 0;
+  flashTime = 0;
 
   constructor(
     readonly car: Car,
     readonly flag: THREE.Mesh,
+    readonly flash: THREE.Mesh,
   ) {}
 }
 
@@ -66,7 +77,7 @@ interface Tomato {
 
 export class Pursuers {
   private readonly pool: Pursuer[] = [];
-  private readonly flagMats: Record<FactionId, THREE.MeshStandardMaterial>;
+  private readonly flagMats: Record<PursuerSide, THREE.MeshStandardMaterial>;
   private readonly tomatoes: Tomato[] = [];
   private readonly tomatoPool: THREE.Mesh[] = [];
   private spawnTimer = 2;
@@ -85,7 +96,12 @@ export class Pursuers {
     private readonly audio: AudioSystem,
     private readonly effects: CarEffects,
   ) {
-    this.flagMats = Object.fromEntries(FACTION_IDS.map((f) => [f, factionFlagMaterial(f)])) as Record<FactionId, THREE.MeshStandardMaterial>;
+    this.flagMats = {
+      ...(Object.fromEntries(FACTION_IDS.map((f) => [f, factionFlagMaterial(f)])) as Record<FactionId, THREE.MeshStandardMaterial>),
+      imprensa: flagMaterial(PRESS.color, PRESS.accent, t('press.flag')),
+    };
+    const flashMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthWrite: false, fog: false });
+    const flashGeo = new THREE.SphereGeometry(0.35, 10, 8);
     PURSUER_MODELS.forEach((id, i) => {
       const base = FLEET.find((d) => d.id === id) ?? FLEET[0];
       const def: VehicleDef = {
@@ -99,9 +115,14 @@ export class Pursuers {
       const car = new Car(physics, cfg, PARK, 0, assets[i] ?? null, def);
       car.body.setEnabled(false);
       const flag = rooftopFlag(car, this.flagMats.vermelhos);
+      // Flash da câmera do fotógrafo (só a imprensa usa): esfera branca que pisca na janela do carona.
+      const flash = new THREE.Mesh(flashGeo, flashMat);
+      flash.position.set(-car.geo.half.x * 0.9, car.geo.cabin.cy, car.geo.half.z * 0.1);
+      flash.visible = false;
+      car.model.root.add(flash);
       scene.add(car.model.root);
       car.model.root.visible = false;
-      this.pool.push(new Pursuer(car, flag));
+      this.pool.push(new Pursuer(car, flag, flash));
     });
     const geo = new THREE.SphereGeometry(0.13, 10, 8);
     const mat = new THREE.MeshStandardMaterial({ color: 0xd11a1a, roughness: 0.45 });
@@ -116,7 +137,7 @@ export class Pursuers {
 
   /** Carros ativos (em cena). */
   get active(): Car[] {
-    return this.pool.filter((p) => p.faction).map((p) => p.car);
+    return this.pool.filter((p) => p.side).map((p) => p.car);
   }
 
   /** Todos os carros do pool (para materiais/luzes do ambiente). */
@@ -125,12 +146,17 @@ export class Pursuers {
   }
 
   get count(): number {
-    return this.pool.filter((p) => p.faction).length;
+    return this.pool.filter((p) => p.side).length;
   }
 
   /** Facções com algum perseguidor em cena (a polarização delas não esfria durante a perseguição). */
   chasing(f: FactionId): boolean {
-    return this.pool.some((p) => p.faction === f && !p.leaving);
+    return this.pool.some((p) => p.side === f && !p.leaving);
+  }
+
+  /** Imprensa em cena. */
+  get pressCount(): number {
+    return this.pool.filter((p) => p.side === 'imprensa').length;
   }
 
   /** Carro do pool dono deste corpo (para os props derrubados). */
@@ -140,20 +166,23 @@ export class Pursuers {
 
   /** Mostra tudo durante a compilação de shaders no carregamento (sem travadas no 1º surgimento). */
   setCompileVisible(on: boolean): void {
-    for (const p of this.pool) p.car.model.root.visible = on || p.faction !== null;
+    for (const p of this.pool) {
+      p.car.model.root.visible = on || p.side !== null;
+      p.flash.visible = on;
+    }
     for (const m of this.tomatoPool) m.visible = on;
   }
 
   /** Para o minimapa. */
   actors(): { x: number; z: number; yaw: number; color: string }[] {
-    return this.pool.filter((p) => p.faction).map((p) => ({ x: p.car.position.x, z: p.car.position.z, yaw: p.car.heading, color: FACTIONS[p.faction!].css }));
+    return this.pool.filter((p) => p.side).map((p) => ({ x: p.car.position.x, z: p.car.position.z, yaw: p.car.heading, color: p.side === 'imprensa' ? PRESS.css : FACTIONS[p.side!].css }));
   }
 
   /**
    * Por frame, antes da física: decide quem entra/sai e define os controles de cada carro.
    * Retorna o que aconteceu (para avisos, falas e polarização).
    */
-  think(dt: number, player: Car, polar: Polarization, camera: THREE.Camera, maxActive: number): PursuitEvent[] {
+  think(dt: number, player: Car, polar: Polarization, camera: THREE.Camera, maxActive: number, pressWanted = 0): PursuitEvent[] {
     this.events.length = 0;
     this.tmpM.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this.tmpM);
@@ -161,49 +190,52 @@ export class Pursuers {
     // Quantos de cada facção (os mais "quentes" primeiro, até o limite total).
     const wanted = Object.fromEntries(FACTION_IDS.map((f) => [f, polar.wanted(f)])) as Record<FactionId, number>;
     const order = [...FACTION_IDS].sort((a, b) => polar.heat[b] - polar.heat[a]);
-    let room = maxActive;
+    // A imprensa tem prioridade nas vagas (a matéria é mais perigosa que o tomate).
+    const press = Math.min(pressWanted, maxActive);
+    let room = maxActive - press;
     for (const f of order) {
       wanted[f] = Math.min(wanted[f], room);
       room -= wanted[f];
     }
-    const have = (f: FactionId) => this.pool.filter((p) => p.faction === f && !p.leaving).length;
-    // A facção esfriou: os que sobram param de perseguir e saem de cena.
-    for (const f of FACTION_IDS) {
-      let extra = have(f) - wanted[f];
+    const have = (f: PursuerSide) => this.pool.filter((p) => p.side === f && !p.leaving).length;
+    const target: Record<PursuerSide, number> = { ...wanted, imprensa: press };
+    // A facção esfriou (ou a suspeição baixou): os que sobram param de perseguir e saem de cena.
+    for (const f of [...FACTION_IDS, 'imprensa'] as PursuerSide[]) {
+      let extra = have(f) - target[f];
       for (const p of this.pool) {
         if (extra <= 0) break;
-        if (p.faction !== f || p.leaving) continue;
+        if (p.side !== f || p.leaving) continue;
         p.leaving = 0.001;
         extra--;
       }
     }
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0) {
-      const f = order.find((id) => have(id) < wanted[id]);
-      const free = this.pool.find((p) => !p.faction);
+      const f = have('imprensa') < press ? 'imprensa' : order.find((id) => have(id) < wanted[id]);
+      const free = this.pool.find((p) => !p.side);
       if (f && free && this.spawn(free, f, player)) this.spawnTimer = P.spawnInterval;
     }
 
-    for (const p of this.pool) if (p.faction) this.drive(p, dt, player);
+    for (const p of this.pool) if (p.side) this.drive(p, dt, player);
     this.updateTomatoes(dt, player);
     return this.events;
   }
 
   fixedUpdate(step: number): void {
-    for (const p of this.pool) if (p.faction) p.car.fixedUpdate(step, p.controls);
+    for (const p of this.pool) if (p.side) p.car.fixedUpdate(step, p.controls);
   }
 
   postStep(): void {
-    for (const p of this.pool) if (p.faction) p.car.postStep();
+    for (const p of this.pool) if (p.side) p.car.postStep();
   }
 
   update(alpha: number): void {
-    for (const p of this.pool) if (p.faction) p.car.update(alpha);
+    for (const p of this.pool) if (p.side) p.car.update(alpha);
   }
 
   /** Tira todos de cena (ex.: imunidade da garagem). */
   clear(): void {
-    for (const p of this.pool) if (p.faction) this.despawn(p);
+    for (const p of this.pool) if (p.side) this.despawn(p);
   }
 
   dispose(): void {
@@ -213,12 +245,12 @@ export class Pursuers {
 
   // -------------------------------------------------------------------------
 
-  private spawn(p: Pursuer, f: FactionId, player: Car): boolean {
+  private spawn(p: Pursuer, f: PursuerSide, player: Car): boolean {
     const target = player.position;
     const spot = this.spawnSpot(target);
     if (!spot) return false;
     const c = p.car;
-    c.model.setPaint(FACTIONS[f].color);
+    c.model.setPaint(f === 'imprensa' ? PRESS.color : FACTIONS[f].color);
     c.model.setDirt(0);
     c.model.repair();
     p.flag.material = this.flagMats[f];
@@ -226,8 +258,9 @@ export class Pursuers {
     c.reset({ x: spot.x, y, z: spot.z }, Math.atan2(target.x - spot.x, target.z - spot.z));
     c.body.setEnabled(true);
     c.model.root.visible = true;
-    Object.assign(p, { faction: f, path: [], idx: 0, replan: 0, stuck: 0, reverse: 0, stuckCount: 0, lose: 0, leaving: 0, touching: false });
+    Object.assign(p, { side: f, path: [], idx: 0, replan: 0, stuck: 0, reverse: 0, stuckCount: 0, lose: 0, leaving: 0, touching: false });
     p.tomato = P.tomatoInterval;
+    p.photo = PRESS.photoInterval;
     p.horn = 1;
     this.events.push({ type: 'spawn', faction: f });
     return true;
@@ -235,7 +268,7 @@ export class Pursuers {
 
   /** Nó de rua a uma distância razoável, de preferência fora da vista e longe dos outros perseguidores. */
   private spawnSpot(target: THREE.Vector3): { x: number; z: number } | null {
-    const others = this.pool.filter((p) => p.faction).map((p) => p.car.position);
+    const others = this.pool.filter((p) => p.side).map((p) => p.car.position);
     const candidates = (this.graph?.nodes ?? []).filter((n) => {
       const d = Math.hypot(n.x - target.x, n.z - target.z);
       if (d < P.spawnMin || d > P.spawnMax || n.edges.length === 0) return false;
@@ -252,7 +285,8 @@ export class Pursuers {
   }
 
   private despawn(p: Pursuer): void {
-    p.faction = null;
+    p.side = null;
+    p.flash.visible = false;
     p.car.body.setEnabled(false);
     p.car.reset(PARK, 0);
     p.car.model.root.visible = false;
@@ -263,7 +297,7 @@ export class Pursuers {
     const c = p.car;
     const ctl = p.controls;
     const pos = c.position;
-    const f = p.faction!;
+    const f = p.side!;
     const tp = player.position;
     const pv = player.body.linvel();
     const d = Math.hypot(tp.x - pos.x, tp.z - pos.z);
@@ -295,18 +329,24 @@ export class Pursuers {
     this.physics.contactPair(player.body.collider(0), c.body.collider(0), (m) => {
       if (m.numContacts() > 0) touching = true;
     });
-    if (touching && !p.touching) {
+    if (touching && !p.touching && f !== 'imprensa') {
       const v = c.body.linvel();
       if (Math.hypot(v.x - pv.x, v.z - pv.z) > 5) this.events.push({ type: 'ram', faction: f });
     }
     p.touching = touching;
+    const press = f === 'imprensa';
+    if (press) this.pressCamera(p, dt, d);
 
     // Para onde ir.
     const attack = d < P.attackDistance || !this.graph;
     let aimX = tp.x;
     let aimZ = tp.z;
     let want = c.p.maxSpeed;
-    if (attack) {
+    if (attack && press) {
+      // Imprensa: segue de perto sem bater (acompanha a velocidade do carro oficial).
+      const gap = d - PRESS.followDistance;
+      want = Math.max(0, Math.hypot(pv.x, pv.z) + gap * 0.6);
+    } else if (attack) {
       const lead = clamp(d / 25, 0, 1) * 0.6; // mira um pouco à frente do carro oficial
       aimX += pv.x * lead;
       aimZ += pv.z * lead;
@@ -342,8 +382,9 @@ export class Pursuers {
     }
     ctl.throttle = speed < want ? 1 : speed > want + 4 ? -0.6 : 0.15;
     if (Math.abs(rel) > 1.3 && speed > 9) ctl.throttle = -0.7;
-    ctl.handbrake = attack && Math.abs(rel) > 0.8 && speed > 13;
-    ctl.turbo = attack && Math.abs(rel) < 0.25 && d > 12;
+    ctl.handbrake = attack && !press && Math.abs(rel) > 0.8 && speed > 13;
+    ctl.turbo = attack && !press && Math.abs(rel) < 0.25 && d > 12;
+    if (press && attack && d < PRESS.followDistance * 0.7) Object.assign(ctl, { throttle: -0.8, turbo: false });
 
     // Preso (acelerando sem sair do lugar): ré com o volante invertido. Preso demais: some ou desvira.
     if (ctl.throttle > 0 && Math.abs(speed) < 1.2) {
@@ -363,8 +404,8 @@ export class Pursuers {
       if ((p.movingTime += dt) > 8) p.stuckCount = 0;
     }
 
-    // Buzinaço e tomates quando está colado.
-    if (attack) {
+    // Buzinaço e tomates quando está colado (só as facções).
+    if (attack && !press) {
       if ((p.horn -= dt) <= 0) {
         p.horn = 2.5 + Math.random() * 3;
         this.audio.play('horn', { position: pos, rate: 0.85 + Math.random() * 0.35 });
@@ -374,6 +415,18 @@ export class Pursuers {
         this.throwTomato(p, player);
       }
     }
+  }
+
+  /** Imprensa: fotos em intervalos quando está perto, com o flash piscando. */
+  private pressCamera(p: Pursuer, dt: number, d: number): void {
+    p.flashTime -= dt;
+    p.flash.visible = p.flashTime > 0;
+    if ((p.photo -= dt) > 0 || d > PRESS.photoRange) return;
+    p.photo = PRESS.photoInterval * (0.8 + Math.random() * 0.4);
+    p.flashTime = 0.09;
+    p.flash.visible = true;
+    this.audio.play('uiClick', { position: p.car.position, rate: 0.6, volume: 1.4 });
+    this.events.push({ type: 'photo', faction: 'imprensa' });
   }
 
   /** Rota até onde o carro oficial deve estar daqui a pouco. */
@@ -405,7 +458,7 @@ export class Pursuers {
     const to = player.position.clone().add(this.tmpV.set(v.x, 0, v.z).multiplyScalar(duration * 0.8)).setY(player.position.y + 1.1);
     mesh.visible = true;
     mesh.position.copy(from);
-    this.tomatoes.push({ mesh, from, to, t: 0, duration, faction: p.faction! });
+    this.tomatoes.push({ mesh, from, to, t: 0, duration, faction: p.side as FactionId });
   }
 
   private updateTomatoes(dt: number, player: Car): void {

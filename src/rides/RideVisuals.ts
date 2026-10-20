@@ -147,3 +147,60 @@ export class PassengerNpc {
     this.root.removeFromParent();
   }
 }
+
+/** Maleta do Dr. Caixeta (Fase 9): uma na calçada, ao lado dele, e outra no banco de trás do carro. */
+export class Maleta {
+  /** Filha do banco de trás do carro atual (o RideManager a move junto com o passageiro). */
+  readonly seated: THREE.Group;
+  readonly ground: THREE.Group;
+
+  constructor() {
+    const leather = new THREE.MeshStandardMaterial({ color: 0x4a2c17, roughness: 0.5 });
+    const metal = new THREE.MeshStandardMaterial({ color: 0xd4b061, metalness: 0.9, roughness: 0.25 });
+    const make = () => {
+      const g = new THREE.Group();
+      g.name = 'maleta';
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.34, 0.12), leather);
+      body.position.y = 0.17;
+      const handle = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 6, 12, Math.PI), leather);
+      handle.position.y = 0.34;
+      for (const x of [-0.14, 0.14]) {
+        const lock = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.03, 0.02), metal);
+        lock.position.set(x, 0.29, 0.065);
+        g.add(lock);
+      }
+      g.add(body, handle);
+      g.traverse((o) => {
+        if (o instanceof THREE.Mesh) o.castShadow = true;
+      });
+      g.visible = false;
+      return g;
+    };
+    this.seated = make();
+    // Em pé no assento, virada para a frente.
+    this.seated.position.set(0, 0.42, 0.05);
+    this.seated.rotation.y = Math.PI / 2;
+    this.ground = make();
+  }
+
+  /** Na calçada, ao lado de quem espera (ou no ponto, se não houver ninguém). */
+  placeBeside(npc: THREE.Object3D | null, x: number, y: number, z: number): void {
+    if (npc) {
+      const side = new THREE.Vector3(0.45, 0, 0).applyQuaternion(npc.quaternion);
+      this.ground.position.set(npc.position.x + side.x, npc.position.y, npc.position.z + side.z);
+      this.ground.quaternion.copy(npc.quaternion);
+    } else this.ground.position.set(x, y, z);
+    this.ground.visible = true;
+  }
+
+  /** Embarque: some da calçada; aparece no banco se for uma corrida de maleta. */
+  board(onSeat: boolean): void {
+    this.ground.visible = false;
+    this.seated.visible = onSeat;
+  }
+
+  hide(): void {
+    this.ground.visible = false;
+    this.seated.visible = false;
+  }
+}

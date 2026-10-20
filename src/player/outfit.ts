@@ -5,6 +5,11 @@ import * as THREE from 'three';
 export interface Look {
   suit: [number, number, number];
   skin: [number, number, number];
+  /**
+   * Tecido do terno recolorido para esta cor (hex), em vez de só multiplicar: necessário para ternos
+   * claros, já que o tecido original é quase preto. Camisa e gravata ficam como estão.
+   */
+  fabric?: number;
 }
 
 export const PASSENGER_LOOKS: readonly Look[] = [
@@ -18,6 +23,43 @@ export const PASSENGER_LOOKS: readonly Look[] = [
 const SUIT = 'Suit';
 const SKIN = 'maleBody';
 
+/** Texturas de terno recoloridas (uma por textura original + cor), geradas na primeira vez. */
+const fabricCache = new Map<string, THREE.Texture>();
+
+function recolorFabric(src: THREE.Texture, color: number): THREE.Texture {
+  const key = `${src.uuid}:${color}`;
+  const hit = fabricCache.get(key);
+  if (hit) return hit;
+  const img = src.image as CanvasImageSource & { width: number; height: number };
+  const canvas = document.createElement('canvas');
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(img, 0, 0);
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = data.data;
+  const target = new THREE.Color(color);
+  const [tr, tg, tb] = [target.r * 255, target.g * 255, target.b * 255];
+  for (let i = 0; i < d.length; i += 4) {
+    const max = Math.max(d[i], d[i + 1], d[i + 2]);
+    const min = Math.min(d[i], d[i + 1], d[i + 2]);
+    // Tecido: escuro e sem cor (camisa é clara; gravata, saturada). Mantém as dobras pelo brilho.
+    if (max > 95 || max - min > 28) continue;
+    const shade = 0.55 + (max / 95) * 0.75;
+    d[i] = Math.min(255, tr * shade);
+    d[i + 1] = Math.min(255, tg * shade);
+    d[i + 2] = Math.min(255, tb * shade);
+  }
+  ctx.putImageData(data, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.flipY = src.flipY;
+  tex.colorSpace = src.colorSpace;
+  tex.wrapS = src.wrapS;
+  tex.wrapT = src.wrapT;
+  fabricCache.set(key, tex);
+  return tex;
+}
+
 /** Clona os materiais do terno e da pele deste boneco e devolve quem aplica um visual. */
 export function makeDresser(root: THREE.Object3D): (look: Look) => void {
   const owned = new Map<string, THREE.MeshStandardMaterial[]>();
@@ -29,8 +71,14 @@ export function makeDresser(root: THREE.Object3D): (look: Look) => void {
     o.material = m;
     owned.set(name, [...(owned.get(name) ?? []), m]);
   });
+  const originalMaps = new Map((owned.get(SUIT) ?? []).map((m) => [m, m.map] as const));
   return (look) => {
-    for (const m of owned.get(SUIT) ?? []) m.color.setRGB(...look.suit);
+    for (const m of owned.get(SUIT) ?? []) {
+      // Trocar de textura (mantendo uma) não recompila o shader.
+      const original = originalMaps.get(m) ?? null;
+      m.map = look.fabric !== undefined && original ? recolorFabric(original, look.fabric) : original;
+      m.color.setRGB(...look.suit);
+    }
     for (const m of owned.get(SKIN) ?? []) m.color.setRGB(...look.skin);
   };
 }

@@ -19,11 +19,12 @@ import {
 import type { CharacterAsset } from '../player/CharacterAsset';
 import { PASSENGER_LOOKS } from '../player/outfit';
 import { FACTIONS, PURSUIT, type FactionId } from '../data/factions';
+import { CAIXETA, CAIXETA_LINES, FAVORS, MALETA_LINES, type FavorKind } from '../data/banker';
 import { SeatedDriver } from '../player/SeatedDriver';
 import type { Config } from '../config';
 import type { Car, CarEvent } from '../vehicle/Car';
 import type { AddressPoint, Level } from '../world/Level';
-import { Beacon, DirectionArrow, PassengerNpc } from './RideVisuals';
+import { Beacon, DirectionArrow, Maleta, PassengerNpc } from './RideVisuals';
 
 export type RidePhase = 'idle' | 'offered' | 'toPickup' | 'toDropoff' | 'result';
 
@@ -46,7 +47,16 @@ export interface ResultLine {
 export interface RideView {
   phase: RidePhase;
   money: number;
-  offer: { title: string; text: string; route: string; time: string; expiresIn: number; leaning: { text: string; color: string | null } } | null;
+  offer: {
+    title: string;
+    text: string;
+    route: string;
+    time: string;
+    expiresIn: number;
+    leaning: { text: string; color: string | null };
+    /** Favor do Dr. Caixeta (celular particular) em vez de chamado do rádio. */
+    favor: boolean;
+  } | null;
   ride: { title: string; address: string; distance: number; timeLeft: number | null; hint: string | null; urgent: boolean } | null;
   result: { title: string; lines: ResultLine[]; total: number; late: boolean } | null;
   bubble: string | null;
@@ -74,6 +84,10 @@ export interface RideHooks {
   toast(text: string): void;
   /** Passageiro entregue (no tempo ou não): a polarização reage à facção dele. */
   delivered?(faction: FactionId | null): void;
+  /** Fase 9: favor aceito/recusado; corrida terminada (favor ou não, e se o destino era o banco). */
+  favorAccepted?(): void;
+  favorDeclined?(): void;
+  finished?(info: { favor: FavorKind | null; late: boolean; toBank: boolean }): void;
 }
 
 const COLORS = { pickup: 0xffd34d, dropoff: 0x3ddc84 };
@@ -102,6 +116,10 @@ export class RideManager {
   private readonly rearPassenger: SeatedDriver | null;
   private vehicle: Car | null = null;
   private conditions: RideConditions = { holiday: false, holidayEve: false, rain: false, dry: false, night: false };
+  /** A próxima oferta pode ser um favor (decidido pelo Game, que conhece a suspeição). */
+  favorsAllowed = true;
+  private forceFavor = false;
+  private readonly maleta = new Maleta();
 
   constructor(
     private readonly level: Level,
@@ -117,12 +135,62 @@ export class RideManager {
     if (this.npc) scene.add(this.npc.root);
     this.rearPassenger = character ? new SeatedDriver(character, cfg) : null;
     if (this.rearPassenger) rearSeat.add(this.rearPassenger.root);
+    rearSeat.add(this.maleta.seated);
+    scene.add(this.maleta.ground);
   }
 
   /** Carro atual (frota): o passageiro a bordo muda junto; gorjeta e falas dependem do modelo. */
   setVehicle(car: Car): void {
     this.vehicle = car;
     if (this.rearPassenger) car.model.rearSeat.add(this.rearPassenger.root);
+    car.model.rearSeat.add(this.maleta.seated);
+  }
+
+  /** Favor em andamento (aceito, ainda não entregue). */
+  get activeFavor(): FavorKind | null {
+    return (this.phase === 'toPickup' || this.phase === 'toDropoff') && this.ride?.template.favor ? this.ride.template.favor : null;
+  }
+
+  /** Favor a bordo agora (o Dr. Caixeta ou a maleta no carro). */
+  get favorAboard(): FavorKind | null {
+    return this.phase === 'toDropoff' ? (this.ride?.template.favor ?? null) : null;
+  }
+
+  /** Debug: a próxima oferta (ou a atual, se ociosa) é uma ligação do Dr. Caixeta. */
+  callNow(carPos: THREE.Vector3Like): void {
+    if (this.phase !== 'idle' && this.phase !== 'offered' && this.phase !== 'result') return;
+    this.forceFavor = true;
+    this.offer(carPos);
+  }
+
+  /** A imprensa fotografou: quem está a bordo reage. */
+  photographed(): void {
+    if (this.passengerAboard) this.say('photo', true);
+  }
+
+  /**
+   * Escândalo: a Corregedoria cobra a multa e, se houver favor em andamento, ele é cancelado (a maleta é
+   * apreendida; o Dr. Caixeta "desce na próxima esquina"). Retorna se havia uma maleta.
+   */
+  scandal(fine: number, quiet: number): boolean {
+    this.money -= fine;
+    const favor = this.activeFavor;
+    // Um chamado em aberto é retirado e o rádio fica quieto enquanto a manchete está na tela.
+    if (this.phase === 'offered' || this.phase === 'idle' || this.phase === 'result') {
+      if (this.phase === 'offered') this.ride = null;
+      this.result = null;
+      this.phase = 'idle';
+      this.timer = Math.max(this.timer, quiet);
+    }
+    if (!favor) return false;
+    this.npc?.hide();
+    this.maleta.hide();
+    if (this.rearPassenger) this.rearPassenger.visible = false;
+    this.beacon.hide();
+    this.ride = null;
+    this.phase = 'idle';
+    this.timer = quiet;
+    return favor === 'maleta';
   }
 
   /** Clima/horário/feriado reais (Game atualiza a cada frame; vale para as próximas corridas e falas). */
@@ -138,10 +206,17 @@ export class RideManager {
     this.beacon.setRadius(T.pickupRadius);
     this.beacon.place(from.x, this.groundAt(from), from.z, COLORS.pickup);
     // Passageiro de frente para o centro do mapa (≈ lado da rua na maioria dos endereços).
-    const look = PASSENGER_LOOKS[Math.floor(Math.random() * PASSENGER_LOOKS.length)];
+    const banker = this.ride.passenger.id === CAIXETA.passengerId;
+    const look = banker ? CAIXETA.look : PASSENGER_LOOKS[Math.floor(Math.random() * PASSENGER_LOOKS.length)];
     this.npc?.setLook(look);
     this.rearPassenger?.setLook(look);
     this.npc?.place(from.x, this.groundAt(from), from.z, from.x * 0.98, from.z * 0.98);
+    // Maleta: o Dr. Caixeta espera com ela ao lado, na calçada.
+    if (this.ride.template.favor === 'maleta') this.maleta.placeBeside(this.npc?.root ?? null, from.x, this.groundAt(from), from.z);
+    if (this.ride.template.favor) {
+      this.hooks.favorAccepted?.();
+      this.hooks.toast(t('favor.accepted'));
+    }
     this.hooks.sound('uiConfirm');
   }
 
@@ -158,10 +233,12 @@ export class RideManager {
         break;
       case 'offered':
         if ((this.timer -= f.dt) <= 0) {
+          const favor = !!this.ride?.template.favor;
           this.ride = null;
           this.phase = 'idle';
           this.timer = T.nextCallDelay;
-          this.hooks.toast(t('radio.expired'));
+          if (favor) this.hooks.favorDeclined?.();
+          this.hooks.toast(t(favor ? 'favor.declined' : 'radio.expired'));
         }
         break;
       case 'toPickup':
@@ -196,20 +273,28 @@ export class RideManager {
       offer:
         this.phase === 'offered' && r
           ? {
-              title: t('radio.title'),
-              text: t('radio.call', { passenger: t(r.passenger.nameKey), reason: t(r.template.reasonKey) }),
+              title: t(r.template.favor ? 'phone.title' : 'radio.title'),
+              text: r.template.favor
+                ? t(`favor.call.${r.template.favor}`, { reason: t(r.template.reasonKey) })
+                : t('radio.call', { passenger: t(r.passenger.nameKey), reason: t(r.template.reasonKey) }),
               route: t('radio.route', { from: r.from.label, to: r.to.label }),
               time: t('radio.time', { time: formatTime(r.timeLimit) }),
               expiresIn: this.timer,
-              leaning: r.passenger.faction
-                ? { text: t('radio.leaning', { faction: t(FACTIONS[r.passenger.faction].nameKey) }), color: FACTIONS[r.passenger.faction].css }
-                : { text: t('radio.neutral'), color: null },
+              leaning: r.template.favor
+                ? { text: t('favor.pay', { value: (PAYMENT.base * FAVORS.payMul[r.template.favor]).toLocaleString('pt-BR') }), color: '#ff9f43' }
+                : r.passenger.faction
+                  ? { text: t('radio.leaning', { faction: t(FACTIONS[r.passenger.faction].nameKey) }), color: FACTIONS[r.passenger.faction].css }
+                  : { text: t('radio.neutral'), color: null },
+              favor: !!r.template.favor,
             }
           : null,
       ride:
         r && (this.phase === 'toPickup' || this.phase === 'toDropoff') && target
           ? {
-              title: t(this.phase === 'toPickup' ? 'ride.toPickup' : 'ride.toDropoff', { passenger: t(r.passenger.nameKey) }),
+              title:
+                r.template.favor === 'maleta'
+                  ? t(this.phase === 'toPickup' ? 'favor.toPickupMaleta' : 'favor.toDropoffMaleta')
+                  : t(this.phase === 'toPickup' ? 'ride.toPickup' : 'ride.toDropoff', { passenger: t(r.passenger.nameKey) }),
               address: (this.phase === 'toPickup' ? r.from : r.to).label,
               distance,
               timeLeft: this.phase === 'toDropoff' ? r.timeLeft : null,
@@ -277,9 +362,13 @@ export class RideManager {
     // Feriado ou véspera: todo mundo quer ir para o aeroporto "emendar".
     const c = this.conditions;
     const recess = c.holiday || c.holidayEve;
+    // Favor do Dr. Caixeta (de vez em quando, se o Game permitir) ou corrida comum.
+    const favor = this.forceFavor || (this.favorsAllowed && Math.random() < FAVORS.callChance);
+    this.forceFavor = false;
+    const pool = RIDES.filter((r) => !!r.favor === favor);
     const templates = recess
-      ? RIDES.map((r) => (r.to.includes('aeroporto') ? { ...r, weight: (r.weight ?? 1) * PAYMENT.holidayAirportMul, reasonKey: 'ride.reason.emendar' as const } : r))
-      : RIDES;
+      ? pool.map((r) => (r.to.includes('aeroporto') ? { ...r, weight: (r.weight ?? 1) * PAYMENT.holidayAirportMul, reasonKey: 'ride.reason.emendar' as const } : r))
+      : pool;
     for (let attempt = 0; attempt < 12; attempt++) {
       const template = weightedPick(templates);
       const froms = this.addressesIn(template.from)
@@ -290,12 +379,14 @@ export class RideManager {
       const from = froms[Math.floor(Math.random() * froms.length)].a;
       const tos = this.addressesIn(template.to).filter((a) => {
         const d = Math.hypot(a.x - from.x, a.z - from.z);
-        return a.id !== from.id && d >= T.minDistance && d <= T.maxDistance;
+        return a.id !== from.id && d >= T.minDistance && d <= (template.maxDistance ?? T.maxDistance);
       });
       if (tos.length === 0) continue;
       const to = tos[Math.floor(Math.random() * tos.length)];
-      const pool = template.passengers?.length ? PASSENGERS.filter((p) => template.passengers!.includes(p.id)) : PASSENGERS;
-      const passenger = pool[Math.floor(Math.random() * pool.length)];
+      const people = template.passengers?.length
+        ? PASSENGERS.filter((p) => template.passengers!.includes(p.id))
+        : PASSENGERS.filter((p) => p.id !== CAIXETA.passengerId);
+      const passenger = people[Math.floor(Math.random() * people.length)];
       const dist = Math.hypot(to.x - from.x, to.z - from.z);
       const slack = T.slack * (c.rain ? PAYMENT.rainTimeMul : 1);
       const timeLimit = Math.round(((dist / T.avgSpeed) * slack + T.extraSeconds) / 5) * 5;
@@ -329,7 +420,10 @@ export class RideManager {
     this.stopTime = 0;
     this.phase = 'toDropoff';
     this.npc?.hide();
-    if (this.rearPassenger) this.rearPassenger.visible = true;
+    // Maleta: vai sozinha no banco de trás (o Dr. Caixeta fica na calçada).
+    const maleta = this.ride!.template.favor === 'maleta';
+    if (this.rearPassenger) this.rearPassenger.visible = !maleta;
+    this.maleta.board(maleta);
     this.beacon.setRadius(T.dropoffRadius);
     this.beacon.place(this.ride!.to.x, this.groundAt(this.ride!.to), this.ride!.to.z, COLORS.dropoff);
     this.hooks.sound('doorOpen');
@@ -339,7 +433,8 @@ export class RideManager {
     // Metade das vezes o passageiro comenta o carro (Lexo: a licitação).
     const def = this.vehicle?.def;
     const env = this.environmentLine();
-    if (env && Math.random() < 0.45) this.say(env, true);
+    if (this.ride!.template.favor) this.say('board', true);
+    else if (env && Math.random() < 0.45) this.say(env, true);
     else if (def?.boardLines && Math.random() < 0.6) this.sayKey(`line.board.${def.id}.${1 + Math.floor(Math.random() * def.boardLines)}` as StringKey);
     else this.say('board', true);
   }
@@ -405,7 +500,9 @@ export class RideManager {
     const add = (key: StringKey, value: number, params?: Record<string, number>, text?: Record<string, string>) => {
       if (Math.round(value) !== 0) lines.push({ label: t(key, { ...params, ...text }), value: Math.round(value) });
     };
-    add('result.base', late ? P.base * P.timeoutBase : P.base);
+    const favor = r.template.favor ?? null;
+    if (favor) add('result.favor', P.base * FAVORS.payMul[favor] * (late ? 0.5 : 1));
+    else add('result.base', late ? P.base * P.timeoutBase : P.base);
     if (!late) {
       const tip = r.timeLeft * P.tipPerSecond;
       add('result.tip', tip);
@@ -422,13 +519,15 @@ export class RideManager {
     add('result.escape', s.escapes * PURSUIT.escapeBonus, { n: s.escapes });
     const total = lines.reduce((sum, l) => sum + l.value, 0);
     this.money += total;
-    this.result = { title: t(late ? 'result.title.late' : 'result.title.ok'), lines, total, late };
+    this.result = { title: t(late ? 'result.title.late' : favor ? 'result.title.favor' : 'result.title.ok'), lines, total, late };
 
     this.hooks.delivered?.(r.passenger.faction);
+    this.hooks.finished?.({ favor, late, toBank: r.to.id === 'banco' });
     this.say(late ? 'timeout' : 'arrive', true);
     this.hooks.sound(late ? 'uiError' : 'uiConfirm');
     this.hooks.sound('doorOpen');
     if (this.rearPassenger) this.rearPassenger.visible = false;
+    this.maleta.hide();
     this.beacon.hide();
     this.ride = null;
     this.stopTime = 0;
@@ -449,6 +548,14 @@ export class RideManager {
 
   private say(trigger: LineTrigger, force = false): void {
     if (!force && this.lineCooldown > 0) return;
+    // Favores: o Dr. Caixeta tem falas próprias; com a maleta, só mensagens dele no celular.
+    const favor = this.ride?.template.favor;
+    const own = favor === 'maleta' ? MALETA_LINES : favor === 'carona' ? CAIXETA_LINES : null;
+    if (own) {
+      const n = own[trigger];
+      if (n) this.sayKey(`line.${favor === 'maleta' ? 'maleta' : 'caixeta'}.${trigger}.${1 + Math.floor(Math.random() * n)}` as StringKey);
+      if (n || favor === 'maleta') return;
+    }
     const n = 1 + Math.floor(Math.random() * LINE_COUNTS[trigger]);
     this.sayKey(`line.${trigger}.${n}` as StringKey);
   }

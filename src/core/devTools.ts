@@ -62,6 +62,13 @@ export function setupDevTools(game: Game): () => void {
   fa.add({ calm: () => (game.polarization.reset(), game.pursuers.clear()) }, 'calm').name('zerar e tirar de cena');
   fa.close();
 
+  // Banqueiro (Fase 9): ligação do Dr. Caixeta, suspeição (imprensa a partir de 35/70; escândalo em 100).
+  const bk = gui.addFolder('Banqueiro');
+  bk.add({ call: () => game.rides.callNow(game.car.position) }, 'call').name('ligação do Dr. Caixeta agora');
+  bk.add(game.suspicion, 'value', 0, 100, 1).name('suspeição').listen();
+  bk.add({ scandal: () => (game.suspicion.value = 100) }, 'scandal').name('forçar escândalo');
+  bk.close();
+
   const a = gui.addFolder('Animação');
   a.add(game.localPlayer.avatar, 'showCollider').name('mostrar colisor');
   a.add(cfg.character, 'fadeTime', 0, 1, 0.01).name('crossfade (s)');

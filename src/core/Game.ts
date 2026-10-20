@@ -24,6 +24,8 @@ import { Environment, type EnvSnapshot } from '../env/Environment';
 import { FACTIONS, MAX_PURSUERS, POLARIZATION, PURSUER_MODELS, TERRITORIES, other, type Territory } from '../data/factions';
 import { Polarization } from '../factions/Polarization';
 import { Pursuers, type PursuitEvent } from '../factions/Pursuers';
+import { Suspicion } from '../factions/Suspicion';
+import { FAVORS, SUSPICION } from '../data/banker';
 import { RoadGraph } from '../world/RoadGraph';
 import { SeatedDriver } from '../player/SeatedDriver';
 import { World } from '../world/World';
@@ -74,6 +76,9 @@ export class Game {
   readonly polarization = new Polarization();
   readonly pursuers: Pursuers;
   private territory: Territory | null = null;
+  /** Fase 9: Medidor de Suspeição (favores do Dr. Caixeta, imprensa, Corregedoria). */
+  readonly suspicion = new Suspicion();
+  private suspicionWarned = false;
   private immunityTimer = 0;
   private envTimer = 0;
   private envKey = '';
@@ -281,6 +286,13 @@ export class Game {
       sound: (id) => audio.play(id),
       toast: (text) => this.showToast(text, 3, 'info'),
       delivered: (f) => this.polarization.delivered(f),
+      favorAccepted: () => this.suspicion.accepted(),
+      favorDeclined: () => this.suspicion.declined(),
+      finished: ({ favor, toBank }) => {
+        if (favor) this.suspicion.deliveredFavor();
+        else this.suspicion.cleanRide();
+        if (toBank && !favor) this.suspicion.cafezinho();
+      },
     });
     this.rides.setVehicle(this.car);
 
@@ -416,7 +428,9 @@ export class Game {
       polar: {
         heat: this.polarization.heat,
         territory: this.territory ? { text: t('hud.territory', { faction: t(FACTIONS[this.territory.faction].nameKey), name: t(this.territory.nameKey) }), color: FACTIONS[this.territory.faction].css } : null,
-        pursuers: this.pursuers.count,
+        pursuers: this.pursuers.count - this.pursuers.pressCount,
+        suspicion: this.suspicion.value,
+        press: this.pursuers.pressCount,
       },
       others: this.pursuers.actors(),
     });
@@ -451,7 +465,7 @@ export class Game {
     }
 
     // Perseguidores decidem (com as posições do frame anterior) antes da física.
-    const pursuit = this.pursuers.think(dt, this.car, this.polarization, this.camera, MAX_PURSUERS[this.settings.quality]);
+    const pursuit = this.pursuers.think(dt, this.car, this.polarization, this.camera, MAX_PURSUERS[this.settings.quality], this.suspicion.wantedPress());
 
     // 2) Física em passo fixo
     this.physics.gravity = { x: 0, y: -this.cfg.physics.gravity, z: 0 };
@@ -494,6 +508,7 @@ export class Game {
     for (const c of this.cars) if (c !== this.car) this.carEffects.handleEvents(c.drainEvents(), c.model);
     for (const c of this.pursuers.active) this.carEffects.handleEvents(c.drainEvents(), c.model);
     this.updateFactions(dt, driving, pursuit);
+    this.updateSuspicion(dt, carEvents);
     this.carEffects.update(dt, this.car, this.car.model);
     this.car.model.updateInterior(this.car.steerAngle, this.car.speedKmh, this.carAudio.engineRpm);
     // Mãos no volante (IK): precisa das matrizes do carro já na posição deste frame.
@@ -625,6 +640,10 @@ export class Game {
     this.territory = here;
 
     for (const e of pursuit) {
+      if (e.faction === 'imprensa') {
+        this.handlePress(e.type);
+        continue;
+      }
       const name = t(FACTIONS[e.faction].nameKey);
       if (e.type === 'spawn') {
         this.showToast(t('toast.pursuit.start', { faction: name }), 3, 'error');
@@ -640,6 +659,46 @@ export class Game {
         if (this.car.speedKmh > POLARIZATION.hitMinKmh) this.polarization.hitFactionCar(e.faction);
       }
     }
+  }
+
+  /** Imprensa (Fase 9): avisos e fotos (que alimentam a suspeição). */
+  private handlePress(type: PursuitEvent['type']): void {
+    if (type === 'spawn') {
+      this.showToast(t('toast.press.start'), 3.5, 'error');
+    } else if (type === 'escape') {
+      this.showToast(t('toast.press.escape'), 3, 'info');
+    } else if (type === 'photo') {
+      const favor = this.rides.favorAboard !== null;
+      this.suspicion.photographed(favor);
+      this.rides.photographed();
+      if (favor) this.showToast(t('toast.press.photo'), 1.5, 'error');
+    }
+  }
+
+  /**
+   * Suspeição (Fase 9): sobe com o favor em andamento, a maleta sacudida e as fotos; avisa perto do limite e,
+   * cheia, vira escândalo (multa, maleta apreendida, manchete da Gazeta da Tesourinha).
+   */
+  private updateSuspicion(dt: number, carEvents: readonly CarEvent[]): void {
+    const sus = this.suspicion;
+    sus.update(dt, this.rides.activeFavor !== null);
+    this.rides.favorsAllowed = sus.value < FAVORS.maxSuspicion;
+    // Maleta a bordo + batida forte: abre e voa dinheiro (pastelão).
+    if (this.rides.favorAboard === 'maleta' && carEvents.some((e) => e.type === 'impact' && e.strength > 5)) {
+      sus.maletaShaken();
+      const p = this.car.position;
+      this.carEffects.burst({ x: p.x, y: p.y + 1.3, z: p.z }, 0x4caf50, 22);
+      this.showToast(t('favor.maletaShaken'), 2, 'error');
+    }
+    const warned = sus.value >= 70;
+    if (warned && !this.suspicionWarned) this.showToast(t('toast.suspicion.warning'), 4, 'error');
+    this.suspicionWarned = warned;
+    if (!sus.full) return;
+    const fine = sus.scandal(this.rides.money);
+    const maleta = this.rides.scandal(fine, SUSPICION.scandalQuiet);
+    this.pursuers.clear();
+    this.audio.play('uiError');
+    this.hud.showHeadline(t('scandal.paper'), t('scandal.headline'), t('scandal.sub', { fine: fine.toLocaleString('pt-BR'), maleta: maleta ? t('scandal.maleta') : '' }));
   }
 
   /** Hora/clima/feriado: visual e física a cada frame; HUD, corridas e avisos uma vez por segundo. */

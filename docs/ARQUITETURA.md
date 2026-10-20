@@ -190,6 +190,19 @@ em [ASSETS.md](ASSETS.md).
 - O pool é mostrado durante o `compileAsync` do carregamento, para os materiais já estarem compilados no
   primeiro surgimento.
 
+## Banqueiro e suspeição (`src/data/banker.ts`, `src/factions/Suspicion.ts`)
+
+- **Favores:** são `RideTemplate`s com `favor: 'carona' | 'maleta'`. O `RideManager` sorteia se a próxima
+  oferta é um favor (`FAVORS.callChance`, bloqueado acima de `FAVORS.maxSuspicion`). O Dr. Caixeta é um
+  `Passenger` que só aparece nos favores. As falas dele (`CAIXETA_LINES`) e as da maleta (`MALETA_LINES`)
+  substituem as comuns.
+- **`Suspicion`:** guarda o medidor e o histórico. O `Game` alimenta pelos ganchos do `RideManager`
+  (`favorAccepted`, `favorDeclined`, `finished`), pelas fotos da imprensa e pelas batidas com a maleta.
+- **Imprensa:** é um "lado" do pool de `Pursuers` (`PursuerSide = FactionId | 'imprensa'`), com prioridade
+  nas vagas. `think()` recebe quantos carros da imprensa a suspeição pede.
+- **Ternos claros:** `Look.fabric` recolore o tecido escuro da textura (cache por textura e cor). Trocar
+  `map` por outra textura não recompila o shader.
+
 ## Ambiente real (`src/env/`)
 
 | Arquivo | Papel |

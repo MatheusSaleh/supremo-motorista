@@ -17,8 +17,8 @@ precisa passar.
 | 6 | Mapa expandido | ✅ concluída |
 | 7 | Corridas | ✅ concluída |
 | 8 | Perseguidores e polarização | ✅ concluída |
-| 9 | O banqueiro e o Medidor de Suspeição | ⏳ próxima |
-| 10 | Arquétipos de passageiros | ⏳ |
+| 9 | O banqueiro e o Medidor de Suspeição | ✅ concluída |
+| 10 | Arquétipos de passageiros | ⏳ próxima |
 | 11 | Expediente, sessão, melhorias e salvamento | ⏳ |
 | 12 | Campanha, finais, menus e áudio | ⏳ |
 
@@ -110,6 +110,27 @@ Foram definidas as regras de conteúdo (ver README):
   perseguidor despistado com ele a bordo rende bônus.
 - **Debug:** a pasta "Facções" do painel ajusta o calor de cada lado.
 
+### Fase 9 — O banqueiro e o Medidor de Suspeição
+- **Ligações do Dr. Rubens Caixeta** (Banco Confiança S.A., fictício) no "celular particular", com um painel
+  verde diferente do rádio. Em cerca de 30% das ofertas, ele pede um favor:
+  - **Carona:** ele mesmo, de terno creme, com falas próprias de banqueiro. Paga 3 diárias.
+  - **Maleta:** ela espera na calçada e vai sozinha no banco de trás, enquanto ele manda SMS ("é só
+    papelada"). Paga 5 diárias. Batida forte com a maleta faz dinheiro voar pela janela.
+  - Ignorar a ligação recusa o favor.
+- **Medidor de Suspeição** no HUD:
+  - **Sobe:** ao aceitar e ao entregar favores, durante o favor, quando a maleta sacode, nas fotos da
+    imprensa e nos "cafezinhos" no banco.
+  - **Desce:** com o tempo, com corridas limpas e recusando favores.
+  - Com a suspeição alta, o Dr. Caixeta para de ligar.
+- **Imprensa** (Gazeta da Tesourinha, fictícia): carros brancos com a bandeira "IMPRENSA" aparecem a partir
+  de 35 e 70 de suspeição. Eles reaproveitam o pool dos perseguidores, mas seguem a uns 18 m sem bater e
+  fotografam, com flash. Foto com favor a bordo é flagrante e pesa muito no medidor.
+- **Escândalo (100):** a Corregedoria do Tribunal (fictícia) multa em 40% do dinheiro (mínimo de R$ 400),
+  apreende a maleta, o Dr. Caixeta "não conhece esse rapaz", a imprensa vai embora e uma manchete ocupa a
+  tela. O medidor volta para 30.
+- O histórico de favores aceitos e recusados e de escândalos fica guardado para a campanha e os finais.
+- **Debug:** a pasta "Banqueiro" do painel traz a ligação na hora, a suspeição e um escândalo forçado.
+
 ### Extras feitos entre as fases
 - **Sons (todos CC0):**
   - motor que varia com a rotação e cantada de pneu sintetizada;
@@ -155,12 +176,6 @@ Foram definidas as regras de conteúdo (ver README):
 ---
 
 ## O que falta
-
-### Fase 9 — O banqueiro e o Medidor de Suspeição ⏳
-- Corridas especiais do **Dr. Rubens Caixeta** (Banco Confiança S.A.), que pagam muito acima da diária. O
-  "cafezinho no banco", já existente, vira o gancho.
-- **Medidor de Suspeição:** sobe com cada favor ao banqueiro e com rotas "estranhas". Cheio, traz
-  consequências: auditoria, perseguição, multa, perda de carro.
 
 ### Fase 10 — Arquétipos de passageiros ⏳
 Os cinco tipos já cadastrados em `src/data/rides.ts` ganham comportamento próprio:
