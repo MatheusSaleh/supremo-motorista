@@ -24,6 +24,7 @@ export class RideHud {
         <div class="ride-radio-title" data-ref="radioTitle"></div>
         <div data-ref="radioText"></div>
         <div class="ride-radio-leaning" data-ref="radioLeaning"></div>
+        <div class="ride-radio-profile" data-ref="radioProfile" hidden></div>
         <div class="ride-radio-route" data-ref="radioRoute"></div>
         <div class="ride-radio-foot"><span data-ref="radioTime"></span>
           <button type="button" class="hud-primary" data-ref="accept">${t(touch ? 'radio.acceptTouch' : 'radio.accept')}</button></div>
@@ -33,6 +34,7 @@ export class RideHud {
         <div class="ride-panel-title" data-ref="title"></div>
         <div class="ride-panel-address" data-ref="address"></div>
         <div class="ride-panel-row"><span data-ref="distance"></span><span class="ride-timer" data-ref="timer"></span></div>
+        <div class="ride-panel-status" data-ref="status" hidden></div>
         <div class="ride-panel-hint" data-ref="hint" hidden></div>
       </div>
       <div class="ride-wallet" data-ref="wallet"></div>
@@ -62,6 +64,9 @@ export class RideHud {
         const leaning = this.q('radioLeaning');
         leaning.textContent = v.offer.leaning.text;
         leaning.style.color = v.offer.leaning.color ?? '';
+        const profile = this.q('radioProfile');
+        profile.hidden = !v.offer.profile;
+        profile.textContent = v.offer.profile ?? '';
         this.q('radioRoute').textContent = v.offer.route;
         this.q('radioTime').textContent = v.offer.time;
       }
@@ -77,6 +82,9 @@ export class RideHud {
       const timer = this.q('timer');
       timer.textContent = v.ride.timeLeft !== null ? formatTime(v.ride.timeLeft) : '';
       timer.classList.toggle('urgent', v.ride.urgent);
+      const status = this.q('status');
+      status.hidden = !v.ride.status;
+      if (v.ride.status && status.textContent !== v.ride.status) status.textContent = v.ride.status;
       const hint = this.q('hint');
       hint.hidden = !v.ride.hint;
       if (v.ride.hint) hint.textContent = v.ride.hint;

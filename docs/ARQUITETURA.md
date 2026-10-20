@@ -203,6 +203,15 @@ em [ASSETS.md](ASSETS.md).
 - **Ternos claros:** `Look.fabric` recolore o tecido escuro da textura (cache por textura e cor). Trocar
   `map` por outra textura não recompila o shader.
 
+## Arquétipos (`src/rides/Quirk.ts`, `src/data/archetypes.ts`)
+
+- Cada corrida tem um `Quirk`, criado pelo arquétipo do passageiro. O `RideManager` repassa eventos (salto,
+  batida, início de derrapagem, buzina, foto) e chama `update` a cada frame. O `Quirk` fala pelo `say`
+  recebido (com duração opcional do balão) e devolve um status para o painel e linhas extras para a conta.
+- A parada do Palestrante é do `RideManager` (`ActiveRide.stop`): é escolhida no chamado, entre os endereços
+  com menor desvio, e vira o alvo até ser cumprida.
+- Regras e valores ficam em `ARCHETYPE_RULES`; as áreas movimentadas, em `BUSY_AREAS`.
+
 ## Ambiente real (`src/env/`)
 
 | Arquivo | Papel |

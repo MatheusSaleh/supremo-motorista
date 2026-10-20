@@ -147,7 +147,18 @@ export type LineTrigger =
   | 'hostile'
   | 'friendly'
   // Imprensa (Fase 9).
-  | 'photo';
+  | 'photo'
+  // Arquétipos (Fase 10).
+  | 'speech'
+  | 'speechEnd'
+  | 'interrupted'
+  | 'stopAsk'
+  | 'lecture'
+  | 'scared'
+  | 'thrilled'
+  | 'rush'
+  | 'exposed'
+  | 'hidden';
 
 /** Quantas variações de cada fala existem no i18n (chaves line.<gatilho>.<n>). */
 export const LINE_COUNTS: Record<LineTrigger, number> = {
@@ -173,4 +184,14 @@ export const LINE_COUNTS: Record<LineTrigger, number> = {
   hostile: 3,
   friendly: 2,
   photo: 3,
+  speech: 6,
+  speechEnd: 3,
+  interrupted: 3,
+  stopAsk: 3,
+  lecture: 3,
+  scared: 3,
+  thrilled: 3,
+  rush: 3,
+  exposed: 3,
+  hidden: 2,
 };

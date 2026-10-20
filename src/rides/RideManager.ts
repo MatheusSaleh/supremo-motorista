@@ -25,6 +25,8 @@ import type { Config } from '../config';
 import type { Car, CarEvent } from '../vehicle/Car';
 import type { AddressPoint, Level } from '../world/Level';
 import { Beacon, DirectionArrow, Maleta, PassengerNpc } from './RideVisuals';
+import { Quirk } from './Quirk';
+import { ARCHETYPE_RULES } from '../data/archetypes';
 
 export type RidePhase = 'idle' | 'offered' | 'toPickup' | 'toDropoff' | 'result';
 
@@ -36,6 +38,10 @@ interface ActiveRide {
   timeLimit: number;
   timeLeft: number;
   stats: { jumps: number; driftTime: number; crashes: number; props: number; lake: boolean; escapes: number };
+  /** Fase 10: o jeito do passageiro (arquétipo). */
+  quirk: Quirk;
+  /** Palestrante: parada obrigatória no caminho (timer = segundos parado lá). */
+  stop: { address: AddressPoint; done: boolean; timer: number } | null;
 }
 
 export interface ResultLine {
@@ -56,8 +62,19 @@ export interface RideView {
     leaning: { text: string; color: string | null };
     /** Favor do Dr. Caixeta (celular particular) em vez de chamado do rádio. */
     favor: boolean;
+    /** Fase 10: perfil do passageiro (regras especiais desta corrida), ou null. */
+    profile: string | null;
   } | null;
-  ride: { title: string; address: string; distance: number; timeLeft: number | null; hint: string | null; urgent: boolean } | null;
+  ride: {
+    title: string;
+    address: string;
+    distance: number;
+    timeLeft: number | null;
+    hint: string | null;
+    urgent: boolean;
+    /** Fase 10: situação do arquétipo (discurso, exposição, parada…). */
+    status: string | null;
+  } | null;
   result: { title: string; lines: ResultLine[]; total: number; late: boolean } | null;
   bubble: string | null;
   /** Alvo atual (minimapa). */
@@ -74,6 +91,8 @@ export interface RideFrame {
   carEvents: readonly CarEvent[];
   propsBroken: number;
   splashed: boolean;
+  /** Buzinando (interrompe o Orador). */
+  horn: boolean;
   /** Onde a seta 3D deve ficar e em que escala (carro, cockpit ou a pé). */
   arrowAnchor: THREE.Vector3;
   arrowScale: number;
@@ -90,7 +109,7 @@ export interface RideHooks {
   finished?(info: { favor: FavorKind | null; late: boolean; toBank: boolean }): void;
 }
 
-const COLORS = { pickup: 0xffd34d, dropoff: 0x3ddc84 };
+const COLORS = { pickup: 0xffd34d, dropoff: 0x3ddc84, stop: 0xb388ff };
 
 export class RideManager {
   money = 0;
@@ -119,6 +138,8 @@ export class RideManager {
   /** A próxima oferta pode ser um favor (decidido pelo Game, que conhece a suspeição). */
   favorsAllowed = true;
   private forceFavor = false;
+  /** Debug: id do passageiro da próxima corrida comum (null = sorteio). */
+  forcedPassenger: string | null = null;
   private readonly maleta = new Maleta();
 
   constructor(
@@ -163,9 +184,19 @@ export class RideManager {
     this.offer(carPos);
   }
 
+  /** Debug: novo chamado agora (comum, com o passageiro forçado, se houver). */
+  offerNow(carPos: THREE.Vector3Like): void {
+    if (this.phase !== 'idle' && this.phase !== 'offered' && this.phase !== 'result') return;
+    this.ride = null;
+    this.phase = 'idle';
+    this.offer(carPos);
+  }
+
   /** A imprensa fotografou: quem está a bordo reage. */
   photographed(): void {
-    if (this.passengerAboard) this.say('photo', true);
+    if (!this.passengerAboard) return;
+    this.ride!.quirk.photographed();
+    this.say('photo', true);
   }
 
   /**
@@ -246,7 +277,9 @@ export class RideManager {
         break;
       case 'toDropoff':
         this.trackRide(f);
-        if (this.phase === 'toDropoff' && this.stoppedNear(f, this.ride!.to, T.dropoffRadius)) this.finish(false);
+        if (this.phase !== 'toDropoff') break;
+        if (this.pendingStop) this.updateStop(f);
+        else if (this.stoppedNear(f, this.ride!.to, T.dropoffRadius)) this.finish(false);
         break;
       case 'result':
         if ((this.timer -= f.dt) <= 0) {
@@ -286,6 +319,7 @@ export class RideManager {
                   ? { text: t('radio.leaning', { faction: t(FACTIONS[r.passenger.faction].nameKey) }), color: FACTIONS[r.passenger.faction].css }
                   : { text: t('radio.neutral'), color: null },
               favor: !!r.template.favor,
+              profile: r.quirk.profile,
             }
           : null,
       ride:
@@ -294,12 +328,13 @@ export class RideManager {
               title:
                 r.template.favor === 'maleta'
                   ? t(this.phase === 'toPickup' ? 'favor.toPickupMaleta' : 'favor.toDropoffMaleta')
-                  : t(this.phase === 'toPickup' ? 'ride.toPickup' : 'ride.toDropoff', { passenger: t(r.passenger.nameKey) }),
-              address: (this.phase === 'toPickup' ? r.from : r.to).label,
+                  : t(this.pendingStop ? 'ride.toStop' : this.phase === 'toPickup' ? 'ride.toPickup' : 'ride.toDropoff', { passenger: t(r.passenger.nameKey) }),
+              address: (this.phase === 'toPickup' ? r.from : (this.pendingStop ?? r.to)).label,
               distance,
               timeLeft: this.phase === 'toDropoff' ? r.timeLeft : null,
-              hint: distance < radius * 2.5 ? t(this.phase === 'toPickup' ? 'ride.stopToBoard' : 'ride.stopToDrop') : null,
+              hint: distance < radius * 2.5 ? t(this.phase === 'toPickup' ? 'ride.stopToBoard' : this.pendingStop ? 'ride.stopToLecture' : 'ride.stopToDrop') : null,
               urgent: this.phase === 'toDropoff' && r.timeLeft < 20,
+              status: this.rideStatus(r),
             }
           : null,
       result: this.phase === 'result' ? this.result : null,
@@ -353,8 +388,44 @@ export class RideManager {
   private currentTarget(): { x: number; z: number } | null {
     if (!this.ride) return null;
     if (this.phase === 'toPickup') return this.ride.from;
-    if (this.phase === 'toDropoff') return this.ride.to;
+    if (this.phase === 'toDropoff') return this.pendingStop ?? this.ride.to;
     return null;
+  }
+
+  /** Parada do Palestrante ainda por fazer (a bordo). */
+  private get pendingStop(): AddressPoint | null {
+    const st = this.ride?.stop;
+    return this.phase === 'toDropoff' && st && !st.done ? st.address : null;
+  }
+
+  /** Situação do arquétipo para o painel (a parada do Palestrante tem prioridade). */
+  private rideStatus(r: ActiveRide): string | null {
+    if (this.phase !== 'toDropoff') return null;
+    const st = r.stop;
+    if (st && !st.done) {
+      return st.timer > 0
+        ? t('status.lecturing', { s: Math.ceil(ARCHETYPE_RULES.palestrante.stopSeconds - st.timer) })
+        : t('status.stop', { address: st.address.label });
+    }
+    if (st?.done && r.quirk.kind === 'palestrante') return t('status.stopDone');
+    return r.quirk.status();
+  }
+
+  /** Palestrante parado na parada: conta o tempo; ao completar, segue para o destino. */
+  private updateStop(f: RideFrame): void {
+    const r = this.ride!;
+    const st = r.stop!;
+    if (!this.stoppedNear(f, st.address, T.dropoffRadius)) {
+      st.timer = 0;
+      return;
+    }
+    st.timer += f.dt;
+    if (st.timer < ARCHETYPE_RULES.palestrante.stopSeconds) return;
+    st.done = true;
+    this.stopTime = 0;
+    this.say('lecture', true);
+    this.hooks.sound('doorClose');
+    this.beacon.place(r.to.x, this.groundAt(r.to), r.to.z, COLORS.dropoff);
   }
 
   /** Sorteia uma corrida: embarque entre os endereços mais próximos do carro, destino a distância razoável. */
@@ -386,11 +457,20 @@ export class RideManager {
       const people = template.passengers?.length
         ? PASSENGERS.filter((p) => template.passengers!.includes(p.id))
         : PASSENGERS.filter((p) => p.id !== CAIXETA.passengerId);
-      const passenger = people[Math.floor(Math.random() * people.length)];
-      const dist = Math.hypot(to.x - from.x, to.z - from.z);
+      const forced = people.find((p) => p.id === this.forcedPassenger);
+      const passenger = forced ?? people[Math.floor(Math.random() * people.length)];
+      const quirk = new Quirk(passenger.archetype);
+      // Palestrante: escolhe a parada com o menor desvio (entre as três melhores, para variar).
+      const stopAt = passenger.archetype === 'palestrante' ? this.pickStop(from, to) : null;
+      const stop = stopAt ? { address: stopAt, done: false, timer: 0 } : null;
+      const dist = stopAt
+        ? Math.hypot(stopAt.x - from.x, stopAt.z - from.z) + Math.hypot(to.x - stopAt.x, to.z - stopAt.z)
+        : Math.hypot(to.x - from.x, to.z - from.z);
       const slack = T.slack * (c.rain ? PAYMENT.rainTimeMul : 1);
-      const timeLimit = Math.round(((dist / T.avgSpeed) * slack + T.extraSeconds) / 5) * 5;
-      this.ride = { template, passenger, from, to, timeLimit, timeLeft: timeLimit, stats: { jumps: 0, driftTime: 0, crashes: 0, props: 0, lake: false, escapes: 0 } };
+      const extra = T.extraSeconds + (stop ? ARCHETYPE_RULES.palestrante.stopSeconds + 10 : 0);
+      const timeLimit = Math.round((((dist / T.avgSpeed) * slack + extra) * quirk.timeMul) / 5) * 5;
+      const stats = { jumps: 0, driftTime: 0, crashes: 0, props: 0, lake: false, escapes: 0 };
+      this.ride = { template, passenger, from, to, timeLimit, timeLeft: timeLimit, stats, quirk, stop };
       this.phase = 'offered';
       this.timer = T.callExpires;
       this.hooks.sound('uiNotify');
@@ -402,6 +482,18 @@ export class RideManager {
 
   private groundAt(p: { x: number; z: number }): number {
     return this.level.heightAt?.(p.x, p.z) ?? 0;
+  }
+
+  /** Endereço de parada do Palestrante: longe da origem e do destino, com o menor desvio possível. */
+  private pickStop(from: AddressPoint, to: AddressPoint): AddressPoint | null {
+    const R = ARCHETYPE_RULES.palestrante;
+    const d = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z);
+    const options = this.addressesIn(R.stopPools)
+      .filter((a) => a.id !== from.id && a.id !== to.id && d(a, from) >= R.stopMinDistance && d(a, to) >= R.stopMinDistance)
+      .map((a) => ({ a, detour: d(from, a) + d(a, to) - d(from, to) }))
+      .sort((p, q) => p.detour - q.detour)
+      .slice(0, 3);
+    return options.length ? options[Math.floor(Math.random() * options.length)].a : null;
   }
 
   private addressesIn(pools: PoolId[]): AddressPoint[] {
@@ -425,7 +517,9 @@ export class RideManager {
     if (this.rearPassenger) this.rearPassenger.visible = !maleta;
     this.maleta.board(maleta);
     this.beacon.setRadius(T.dropoffRadius);
-    this.beacon.place(this.ride!.to.x, this.groundAt(this.ride!.to), this.ride!.to.z, COLORS.dropoff);
+    const stop = this.ride!.stop;
+    if (stop) this.beacon.place(stop.address.x, this.groundAt(stop.address), stop.address.z, COLORS.stop);
+    else this.beacon.place(this.ride!.to.x, this.groundAt(this.ride!.to), this.ride!.to.z, COLORS.dropoff);
     this.hooks.sound('doorOpen');
     this.hooks.sound('doorClose');
     this.hurried = false;
@@ -434,6 +528,7 @@ export class RideManager {
     const def = this.vehicle?.def;
     const env = this.environmentLine();
     if (this.ride!.template.favor) this.say('board', true);
+    else if (stop) this.say('stopAsk', true);
     else if (env && Math.random() < 0.45) this.say(env, true);
     else if (def?.boardLines && Math.random() < 0.6) this.sayKey(`line.board.${def.id}.${1 + Math.floor(Math.random() * def.boardLines)}` as StringKey);
     else this.say('board', true);
@@ -451,10 +546,10 @@ export class RideManager {
     for (const e of f.carEvents) {
       if (e.type === 'land' && e.airTime > PAYMENT.jumpMinAir) {
         r.stats.jumps++;
-        this.say('jump');
+        if (!r.quirk.jumped(this.sayFn)) this.say('jump');
       } else if (e.type === 'impact' && e.strength > 5) {
         r.stats.crashes++;
-        this.say('crash');
+        if (!r.quirk.crashed(this.sayFn)) this.say('crash');
       }
     }
     if (f.propsBroken > 0) {
@@ -469,8 +564,9 @@ export class RideManager {
     if (f.slip > 0.5 && f.kmh > 25) {
       r.stats.driftTime += f.dt;
       this.driftRun += f.dt;
-      if (this.driftRun > 0.9 && this.driftRun - f.dt <= 0.9) this.say('drift');
+      if (this.driftRun > 0.9 && this.driftRun - f.dt <= 0.9 && !r.quirk.drifted(this.sayFn)) this.say('drift');
     } else this.driftRun = 0;
+    r.quirk.update({ dt: f.dt, kmh: f.kmh, slip: f.slip, x: f.carPos.x, z: f.carPos.z, horn: f.horn }, this.sayFn);
     this.fastRun = f.kmh > 115 ? this.fastRun + f.dt : 0;
     if (this.fastRun > 2.5) {
       this.fastRun = -12; // não repete logo
@@ -485,7 +581,7 @@ export class RideManager {
       this.hurried = true;
       this.say('hurry', true);
     }
-    if ((this.idleTimer -= f.dt) <= 0) {
+    if ((this.idleTimer -= f.dt) <= 0 && !r.quirk.busyTalking) {
       this.idleTimer = 18 + Math.random() * 12;
       const env = this.environmentLine();
       if (!this.bubble) this.say(env && Math.random() < 0.3 ? env : 'idle');
@@ -513,6 +609,10 @@ export class RideManager {
     if (this.conditions.night) add('result.night', P.base * P.nightBonus);
     add('result.jumps', s.jumps * P.jumpBonus, { n: s.jumps });
     add('result.drift', s.driftTime * P.driftBonusPerSecond);
+    const extra = r.quirk.bonusMul - 1;
+    if (extra > 0) add('result.thrilled', (s.jumps * P.jumpBonus + s.driftTime * P.driftBonusPerSecond) * extra);
+    r.quirk.result(add, late, late ? 0 : r.timeLeft * P.tipPerSecond);
+    if (r.stop?.done) add('result.lecture', ARCHETYPE_RULES.palestrante.stopBonus);
     add('result.crashes', -s.crashes * P.crashPenalty, { n: s.crashes });
     add('result.props', -s.props * P.propPenalty, { n: s.props });
     if (s.lake) add('result.lake', -P.lakePenalty);
@@ -546,7 +646,10 @@ export class RideManager {
     return options.length ? options[Math.floor(Math.random() * options.length)] : null;
   }
 
-  private say(trigger: LineTrigger, force = false): void {
+  /** `say` para o Quirk (arquétipo), com duração opcional do balão. */
+  private readonly sayFn = (trigger: LineTrigger, force = false, ttl?: number) => this.say(trigger, force, ttl);
+
+  private say(trigger: LineTrigger, force = false, ttl?: number): void {
     if (!force && this.lineCooldown > 0) return;
     // Favores: o Dr. Caixeta tem falas próprias; com a maleta, só mensagens dele no celular.
     const favor = this.ride?.template.favor;
@@ -557,12 +660,12 @@ export class RideManager {
       if (n || favor === 'maleta') return;
     }
     const n = 1 + Math.floor(Math.random() * LINE_COUNTS[trigger]);
-    this.sayKey(`line.${trigger}.${n}` as StringKey);
+    this.sayKey(`line.${trigger}.${n}` as StringKey, ttl);
   }
 
-  private sayKey(key: StringKey): void {
+  private sayKey(key: StringKey, ttl?: number): void {
     const text = t(key);
-    this.bubble = { text, ttl: Math.min(5, 2.2 + text.length * 0.04) };
+    this.bubble = { text, ttl: ttl ?? Math.min(5, 2.2 + text.length * 0.04) };
     this.lineCooldown = 3;
   }
 }

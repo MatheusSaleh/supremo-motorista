@@ -1,3 +1,4 @@
+import { archetypesPtBR } from './pt-BR.archetypes';
 import { bankerPtBR } from './pt-BR.banker';
 import { environmentPtBR } from './pt-BR.environment';
 import { factionsPtBR } from './pt-BR.factions';
@@ -14,6 +15,7 @@ export const ptBR = {
   ...environmentPtBR,
   ...factionsPtBR,
   ...bankerPtBR,
+  ...archetypesPtBR,
   'game.title': 'Supremo Motorista',
   'game.subtitle': 'Transporte Oficial do Tribunal',
 

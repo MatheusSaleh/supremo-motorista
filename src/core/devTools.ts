@@ -69,6 +69,15 @@ export function setupDevTools(game: Game): () => void {
   bk.add({ scandal: () => (game.suspicion.value = 100) }, 'scandal').name('forçar escândalo');
   bk.close();
 
+  // Passageiros (Fase 10): força o tipo da próxima corrida comum.
+  const pa = gui.addFolder('Passageiros');
+  const who = { passageiro: 'sorteio' };
+  pa.add(who, 'passageiro', ['sorteio', 'tiburcio', 'clotilde', 'anselmo', 'dulce', 'euclides'])
+    .name('próximo (arquétipo)')
+    .onChange((v: string) => (game.rides.forcedPassenger = v === 'sorteio' ? null : v));
+  pa.add({ call: () => game.rides.offerNow(game.car.position) }, 'call').name('chamado do rádio agora');
+  pa.close();
+
   const a = gui.addFolder('Animação');
   a.add(game.localPlayer.avatar, 'showCollider').name('mostrar colisor');
   a.add(cfg.character, 'fadeTime', 0, 1, 0.01).name('crossfade (s)');

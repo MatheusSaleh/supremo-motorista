@@ -18,8 +18,8 @@ precisa passar.
 | 7 | Corridas | ✅ concluída |
 | 8 | Perseguidores e polarização | ✅ concluída |
 | 9 | O banqueiro e o Medidor de Suspeição | ✅ concluída |
-| 10 | Arquétipos de passageiros | ⏳ próxima |
-| 11 | Expediente, sessão, melhorias e salvamento | ⏳ |
+| 10 | Arquétipos de passageiros | ✅ concluída |
+| 11 | Expediente, sessão, melhorias e salvamento | ⏳ próxima |
 | 12 | Campanha, finais, menus e áudio | ⏳ |
 
 ---
@@ -131,6 +131,21 @@ Foram definidas as regras de conteúdo (ver README):
 - O histórico de favores aceitos e recusados e de escândalos fica guardado para a campanha e os finais.
 - **Debug:** a pasta "Banqueiro" do painel traz a ligação na hora, a suspeição e um escândalo forçado.
 
+### Fase 10 — Arquétipos de passageiros
+Cada ministro fictício tem um jeito, que o rádio anuncia no chamado e que muda as regras da corrida, as
+falas e a conta:
+
+| Tipo | Ministro | Comportamento |
+|---|---|---|
+| Orador | Tibúrcio Pompeu | faz discursos de tempos em tempos; cada um ouvido inteiro rende gorjeta, e interromper (batida, salto, buzina) custa |
+| Palestrante | Clotilde Vistas | exige uma parada no caminho para uma "palestra rápida" (farol roxo, 2,5 s parado lá); mais tempo de corrida e bônus |
+| Novato | Anselmo Recurso | sorteado a cada corrida: medroso (saltos, derrapagens e mais de 100 km/h tiram gorjeta) ou empolgado (bônus de salto e drift em dobro) |
+| Presidente | Dulce Liminar | 20% menos tempo, gorjeta em dobro e multa se atrasar; reclama se o carro anda devagar |
+| Discreto | Euclides Embargo | bônus de discrição que cai com o tempo em áreas movimentadas (Esplanada, Praça, Rodoviária) e com fotos da imprensa |
+
+- O painel da corrida mostra a situação: discurso em andamento, parada exigida, exposição…
+- **Debug:** a pasta "Passageiros" do painel força o próximo passageiro e chama o rádio na hora.
+
 ### Extras feitos entre as fases
 - **Sons (todos CC0):**
   - motor que varia com a rotação e cantada de pneu sintetizada;
@@ -176,17 +191,6 @@ Foram definidas as regras de conteúdo (ver README):
 ---
 
 ## O que falta
-
-### Fase 10 — Arquétipos de passageiros ⏳
-Os cinco tipos já cadastrados em `src/data/rides.ts` ganham comportamento próprio:
-
-| Tipo | Comportamento previsto |
-|---|---|
-| Orador | fala sem parar; ouvir rende gorjeta |
-| Palestrante | pede paradas e desvios no caminho |
-| Novato | se assusta com saltos e drift (ou adora) |
-| Presidente | exige pressa; atraso custa caro |
-| Discreto | paga mais para não ser visto; evitar áreas movimentadas |
 
 ### Fase 11 — Expediente, sessão, melhorias e salvamento ⏳
 - **Expedientes (turnos):** metas, horário (a hora real já está pronta) e um resumo no fim.

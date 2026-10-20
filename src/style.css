@@ -421,6 +421,21 @@ kbd {
   opacity: 0.9;
 }
 
+.ride-radio-profile {
+  margin-top: 6px;
+  padding: 4px 8px;
+  border-left: 3px solid #b388ff;
+  background: rgb(179 136 255 / 0.12);
+  font-size: 13px;
+}
+
+.ride-panel-status {
+  margin-top: 6px;
+  color: #c9b3ff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .ride-wallet {
   position: absolute;
   top: 12px;

@@ -817,6 +817,7 @@ export class Game {
       carEvents,
       propsBroken: this.framePropsBroken,
       splashed: this.frameSplashed,
+      horn: driving && this.input.isDown('KeyH'),
       arrowAnchor: a,
       arrowScale: scale,
     });
