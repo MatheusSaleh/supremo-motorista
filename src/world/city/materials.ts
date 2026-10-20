@@ -1,6 +1,8 @@
 // Materiais e texturas procedurais (canvas) do cenário.
 import * as THREE from 'three';
+import { t } from '../../core/i18n';
 import { createRng } from '../../core/random';
+import { FACTIONS, type FactionId } from '../../data/factions';
 import { ROAD } from './layout';
 
 export type Materials = ReturnType<typeof createMaterials>;
@@ -77,6 +79,24 @@ function lampMaterial(): THREE.MeshStandardMaterial {
   const m = new THREE.MeshStandardMaterial({ color: 0x8d9196, roughness: 0.5, metalness: 0.5, emissive: 0xffe2a8, emissiveMap: map, emissiveIntensity: 0 });
   m.userData.lampGlow = 4;
   return m;
+}
+
+/** Bandeira de uma facção fictícia (cor, faixa de destaque e o nome). Usada no cenário e nos carros. */
+export function factionFlagMaterial(f: FactionId): THREE.MeshStandardMaterial {
+  const fac = FACTIONS[f];
+  const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
+  const tex = canvasTexture(256, 160, (ctx) => {
+    ctx.fillStyle = hex(fac.color);
+    ctx.fillRect(0, 0, 256, 160);
+    ctx.fillStyle = hex(fac.accent);
+    ctx.fillRect(0, 118, 256, 14);
+    ctx.font = 'bold 40px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(t(`faction.flag.${f}`), 128, 66, 236);
+  });
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  return new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.8 });
 }
 
 /** Material de grama com a textura repetida a cada 6 m para um retângulo w×d. */

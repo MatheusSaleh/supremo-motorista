@@ -16,8 +16,8 @@ precisa passar.
 | 5 | Veículo | ✅ concluída |
 | 6 | Mapa expandido | ✅ concluída |
 | 7 | Corridas | ✅ concluída |
-| 8 | Perseguidores e polarização | ⏳ próxima |
-| 9 | O banqueiro e o Medidor de Suspeição | ⏳ |
+| 8 | Perseguidores e polarização | ✅ concluída |
+| 9 | O banqueiro e o Medidor de Suspeição | ⏳ próxima |
 | 10 | Arquétipos de passageiros | ⏳ |
 | 11 | Expediente, sessão, melhorias e salvamento | ⏳ |
 | 12 | Campanha, finais, menus e áudio | ⏳ |
@@ -51,7 +51,7 @@ precisa passar.
 ### Virada para o Supremo Motorista
 Foram definidas as regras de conteúdo (ver README):
 - tudo fictício;
-- Azuis × Vermelhos;
+- Vermelhos × Amarelos (antes Azuis × Vermelhos);
 - Dr. Rubens Caixeta, do Banco Confiança S.A.;
 - violência só no pastelão;
 - textos no i18n.
@@ -86,6 +86,29 @@ Foram definidas as regras de conteúdo (ver README):
   - entram a diária, a gorjeta pelo tempo que sobrou e bônus por saltos e derrapagens;
   - descontam batidas, "danos ao patrimônio" e mergulhos no lago.
 - O passageiro tem falas próprias para cada situação (salto, batida, pressa, lentidão, chegada…).
+
+### Fase 8 — Perseguidores e polarização
+- **Facções fictícias Vermelhos e Amarelos**, cada uma com **territórios** no mapa (quadras ao norte e a
+  feira para os Vermelhos; quadras ao sul e o Lago Sul para os Amarelos). Bandeiras ao longo das ruas e
+  áreas coloridas no minimapa mostram onde cada um manda.
+- **Polarização:** um "calor" de 0 a 100 por facção, visível no HUD.
+  - **Sobe:** dentro do território, com passageiro rival, em alta velocidade, buzinando, derrubando postes
+    e partindo para cima dos carros da facção.
+  - **Esfria:** com o tempo, com passageiro da própria facção e ao despistar perseguidores. Parar na
+    garagem do Tribunal ("imunidade") zera tudo.
+  - Cada passageiro tem uma simpatia (ou nenhuma), mostrada no rádio. Entregá-lo esfria a facção dele e
+    esquenta a rival.
+- **Perseguidores:** carros da frota pintados de vermelho ou amarelo, com bandeira no teto. De 2 a 4 ao
+  mesmo tempo, conforme a qualidade gráfica.
+  - Surgem fora da vista quando o calor passa de 30, 60 e 85.
+  - **IA:** segue as ruas da cidade com um grafo de navegação (A*), reduzindo nas curvas. Perto do
+    carro oficial, vai direto, com drift e turbo, buzinando, fechando, empurrando e jogando tomates (que
+    sujam o carro).
+  - Presos, dão ré. Desistem quando despistados (4 s a mais de 420 m), quando caem no lago ou quando a
+    facção esfria.
+- **Nas corridas:** o passageiro reage (perseguição, tomate, território amigo ou hostil) e cada
+  perseguidor despistado com ele a bordo rende bônus.
+- **Debug:** a pasta "Facções" do painel ajusta o calor de cada lado.
 
 ### Extras feitos entre as fases
 - **Sons (todos CC0):**
@@ -132,15 +155,6 @@ Foram definidas as regras de conteúdo (ver README):
 ---
 
 ## O que falta
-
-### Fase 8 — Perseguidores e polarização ⏳
-- Carros das facções **Azuis** e **Vermelhos** perseguem o carro oficial, tentando fechar, empurrar e jogar
-  coisas (tomates, cartazes). Tudo no pastelão.
-- **Medidor de polarização:** sobe conforme as corridas, os passageiros e as escolhas do jogador. Quanto mais
-  alto, mais perseguidores e mais agressivos.
-- Perseguidores também sofrem com a física (batem, capotam, caem no lago).
-- **Ainda a decidir:** IA de direção (seguir pistas ou ir direto ao alvo); quantos carros ao mesmo tempo sem
-  pesar no desempenho; como a polarização baixa.
 
 ### Fase 9 — O banqueiro e o Medidor de Suspeição ⏳
 - Corridas especiais do **Dr. Rubens Caixeta** (Banco Confiança S.A.), que pagam muito acima da diária. O

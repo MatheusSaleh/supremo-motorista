@@ -54,6 +54,14 @@ export function setupDevTools(game: Game): () => void {
   e.add(env, 'feriado', ['real', 'sim', 'não']).onChange((v: string) => (game.env.override.holiday = v === 'real' ? null : v === 'sim'));
   e.close();
 
+  // Facções: calor de cada lado (perseguidores aparecem a partir de 30/60/85).
+  const fa = gui.addFolder('Facções');
+  fa.add(game.polarization.heat, 'vermelhos', 0, 100, 1).name('calor Vermelhos').listen();
+  fa.add(game.polarization.heat, 'amarelos', 0, 100, 1).name('calor Amarelos').listen();
+  fa.add({ fire: () => Object.assign(game.polarization.heat, { vermelhos: 90, amarelos: 90 }) }, 'fire').name('provocar os dois (90)');
+  fa.add({ calm: () => (game.polarization.reset(), game.pursuers.clear()) }, 'calm').name('zerar e tirar de cena');
+  fa.close();
+
   const a = gui.addFolder('Animação');
   a.add(game.localPlayer.avatar, 'showCollider').name('mostrar colisor');
   a.add(cfg.character, 'fadeTime', 0, 1, 0.01).name('crossfade (s)');

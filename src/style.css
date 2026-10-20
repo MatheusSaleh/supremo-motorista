@@ -154,6 +154,63 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.hud-polar {
+  width: 168px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--hud-bg);
+  font: 600 11px system-ui, sans-serif;
+}
+
+.hud-polar.hot {
+  box-shadow: 0 0 0 2px #ff5a3d;
+}
+
+.hud-polar-title {
+  margin-bottom: 3px;
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.hud-polar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.hud-polar-row > span {
+  width: 62px;
+}
+
+.hud-polar-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgb(255 255 255 / 0.15);
+  overflow: hidden;
+}
+
+.hud-polar-bar {
+  width: 0;
+  height: 100%;
+  transition: width 0.3s;
+}
+
+.hud-polar-pursuers {
+  margin-top: 4px;
+  color: #ff8a6a;
+  font-weight: 800;
+}
+
+.hud-territory {
+  padding: 3px 10px;
+  border-radius: 8px;
+  color: #111;
+  font: 800 12px system-ui, sans-serif;
+}
+
 .hud-env-badge {
   padding: 3px 10px;
   border-radius: 8px;
@@ -293,6 +350,13 @@ kbd {
   margin-top: 6px;
   color: var(--accent);
   font-weight: 700;
+}
+
+.ride-radio-leaning {
+  margin-top: 4px;
+  font-weight: 700;
+  font-size: 13px;
+  opacity: 0.9;
 }
 
 .ride-wallet {

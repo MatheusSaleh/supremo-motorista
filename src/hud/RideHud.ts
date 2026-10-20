@@ -23,6 +23,7 @@ export class RideHud {
       <div class="ride-radio" data-ref="radio" hidden>
         <div class="ride-radio-title" data-ref="radioTitle"></div>
         <div data-ref="radioText"></div>
+        <div class="ride-radio-leaning" data-ref="radioLeaning"></div>
         <div class="ride-radio-route" data-ref="radioRoute"></div>
         <div class="ride-radio-foot"><span data-ref="radioTime"></span>
           <button type="button" class="hud-primary" data-ref="accept">${t(touch ? 'radio.acceptTouch' : 'radio.accept')}</button></div>
@@ -57,6 +58,9 @@ export class RideHud {
         this.lastKey = key;
         this.q('radioTitle').textContent = v.offer.title;
         this.q('radioText').textContent = v.offer.text;
+        const leaning = this.q('radioLeaning');
+        leaning.textContent = v.offer.leaning.text;
+        leaning.style.color = v.offer.leaning.color ?? '';
         this.q('radioRoute').textContent = v.offer.route;
         this.q('radioTime').textContent = v.offer.time;
       }

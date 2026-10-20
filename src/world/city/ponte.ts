@@ -72,6 +72,9 @@ export function buildPonte(b: CityBuilder): void {
   cables.userData.noCollision = true;
   g.add(cables);
 
+  // Tabuleiro da ponte no grafo de navegação (é diagonal, não é uma pista comum).
+  b.navLink(p.x1, p.z1, p.x2, p.z2, p.width);
+
   // Ligações: orla → cabeceira norte; cabeceira sul → rua do Lago Sul.
   b.road(g, 'local', p.x1, LAKE.shoreRoadZ - ROAD.main / 2, p.x1, p.z1, 'none');
   b.road(g, 'main', p.x2, p.z2, LAGO_SUL.roadsX[0] - ROAD.local / 2, p.z2, 'none');

@@ -18,6 +18,7 @@ import {
 } from '../data/rides';
 import type { CharacterAsset } from '../player/CharacterAsset';
 import { PASSENGER_LOOKS } from '../player/outfit';
+import { FACTIONS, PURSUIT, type FactionId } from '../data/factions';
 import { SeatedDriver } from '../player/SeatedDriver';
 import type { Config } from '../config';
 import type { Car, CarEvent } from '../vehicle/Car';
@@ -33,7 +34,7 @@ interface ActiveRide {
   to: AddressPoint;
   timeLimit: number;
   timeLeft: number;
-  stats: { jumps: number; driftTime: number; crashes: number; props: number; lake: boolean };
+  stats: { jumps: number; driftTime: number; crashes: number; props: number; lake: boolean; escapes: number };
 }
 
 export interface ResultLine {
@@ -45,7 +46,7 @@ export interface ResultLine {
 export interface RideView {
   phase: RidePhase;
   money: number;
-  offer: { title: string; text: string; route: string; time: string; expiresIn: number } | null;
+  offer: { title: string; text: string; route: string; time: string; expiresIn: number; leaning: { text: string; color: string | null } } | null;
   ride: { title: string; address: string; distance: number; timeLeft: number | null; hint: string | null; urgent: boolean } | null;
   result: { title: string; lines: ResultLine[]; total: number; late: boolean } | null;
   bubble: string | null;
@@ -71,6 +72,8 @@ export interface RideFrame {
 export interface RideHooks {
   sound(id: SoundId): void;
   toast(text: string): void;
+  /** Passageiro entregue (no tempo ou não): a polarização reage à facção dele. */
+  delivered?(faction: FactionId | null): void;
 }
 
 const COLORS = { pickup: 0xffd34d, dropoff: 0x3ddc84 };
@@ -198,6 +201,9 @@ export class RideManager {
               route: t('radio.route', { from: r.from.label, to: r.to.label }),
               time: t('radio.time', { time: formatTime(r.timeLimit) }),
               expiresIn: this.timer,
+              leaning: r.passenger.faction
+                ? { text: t('radio.leaning', { faction: t(FACTIONS[r.passenger.faction].nameKey) }), color: FACTIONS[r.passenger.faction].css }
+                : { text: t('radio.neutral'), color: null },
             }
           : null,
       ride:
@@ -215,6 +221,34 @@ export class RideManager {
       bubble: this.bubble?.text ?? null,
       target: target ? { ...target, kind: this.phase === 'toPickup' ? 'pickup' : 'dropoff' } : null,
     };
+  }
+
+  /** Facção do passageiro a bordo: undefined = ninguém a bordo; null = passageiro neutro. */
+  get aboardFaction(): FactionId | null | undefined {
+    return this.phase === 'toDropoff' && this.ride ? this.ride.passenger.faction : undefined;
+  }
+
+  /** Perseguidores apareceram. */
+  pursuitStarted(): void {
+    if (this.passengerAboard) this.say('chase');
+  }
+
+  /** Um perseguidor foi despistado (conta bônus se há passageiro). */
+  pursuerEscaped(): void {
+    if (!this.passengerAboard) return;
+    this.ride!.stats.escapes++;
+    this.say('escape', true);
+  }
+
+  tomatoHit(): void {
+    if (this.passengerAboard) this.say('tomato', true);
+  }
+
+  /** Entrou num território: o passageiro comenta se for da facção dona ou da rival. */
+  enteredTerritory(owner: FactionId): void {
+    const f = this.aboardFaction;
+    if (!f) return;
+    this.say(f === owner ? 'friendly' : 'hostile', true);
   }
 
   /** Passageiro a bordo (para o HUD posicionar o balão). */
@@ -265,7 +299,7 @@ export class RideManager {
       const dist = Math.hypot(to.x - from.x, to.z - from.z);
       const slack = T.slack * (c.rain ? PAYMENT.rainTimeMul : 1);
       const timeLimit = Math.round(((dist / T.avgSpeed) * slack + T.extraSeconds) / 5) * 5;
-      this.ride = { template, passenger, from, to, timeLimit, timeLeft: timeLimit, stats: { jumps: 0, driftTime: 0, crashes: 0, props: 0, lake: false } };
+      this.ride = { template, passenger, from, to, timeLimit, timeLeft: timeLimit, stats: { jumps: 0, driftTime: 0, crashes: 0, props: 0, lake: false, escapes: 0 } };
       this.phase = 'offered';
       this.timer = T.callExpires;
       this.hooks.sound('uiNotify');
@@ -385,10 +419,12 @@ export class RideManager {
     add('result.crashes', -s.crashes * P.crashPenalty, { n: s.crashes });
     add('result.props', -s.props * P.propPenalty, { n: s.props });
     if (s.lake) add('result.lake', -P.lakePenalty);
+    add('result.escape', s.escapes * PURSUIT.escapeBonus, { n: s.escapes });
     const total = lines.reduce((sum, l) => sum + l.value, 0);
     this.money += total;
     this.result = { title: t(late ? 'result.title.late' : 'result.title.ok'), lines, total, late };
 
+    this.hooks.delivered?.(r.passenger.faction);
     this.say(late ? 'timeout' : 'arrive', true);
     this.hooks.sound(late ? 'uiError' : 'uiConfirm');
     this.hooks.sound('doorOpen');

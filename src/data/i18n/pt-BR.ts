@@ -1,4 +1,5 @@
 import { environmentPtBR } from './pt-BR.environment';
+import { factionsPtBR } from './pt-BR.factions';
 import { ridesPtBR } from './pt-BR.rides';
 import { vehiclesPtBR } from './pt-BR.vehicles';
 
@@ -10,6 +11,7 @@ export const ptBR = {
   ...ridesPtBR,
   ...vehiclesPtBR,
   ...environmentPtBR,
+  ...factionsPtBR,
   'game.title': 'Supremo Motorista',
   'game.subtitle': 'Transporte Oficial do Tribunal',
 

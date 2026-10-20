@@ -11,7 +11,7 @@ import { lawnMaterial } from './materials';
 import { buildMarcos } from './marcos';
 import { buildPonte } from './ponte';
 import { buildPraca, garageSpawns } from './praca';
-import { buildBounds, buildSigns, buildStreetLights, buildTrees } from './props';
+import { buildBounds, buildFactionFlags, buildSigns, buildStreetLights, buildTrees } from './props';
 import { drapeOnTerrain } from './drape';
 import { createTerrain } from './terrain';
 
@@ -44,6 +44,7 @@ export function createCity(seed = 1960): Level {
 
   buildSigns(b);
   buildStreetLights(b);
+  buildFactionFlags(b);
   buildTrees(b, land, 2600);
   buildBounds(b, BOUNDS);
 
@@ -65,6 +66,7 @@ export function createCity(seed = 1960): Level {
     vehicleSpawn: s.fleet[2],
     fleetSpawns: s.fleet,
     heightAt,
+    roads: b.roadSegments,
     landmarks: b.landmarks,
     bounds: { ...BOUNDS },
     addresses: b.addresses,

@@ -24,6 +24,7 @@ export class CarEffects {
   /** Pista molhada (0..1): rodas levantam spray no asfalto. Ajustado pelo env/Atmosphere. */
   wet = 0;
   private readonly tmp = new THREE.Vector3();
+  private readonly tmpColor = new THREE.Color();
 
   constructor(scene: THREE.Scene) {
     const geo = new THREE.BufferGeometry();
@@ -101,6 +102,28 @@ export class CarEffects {
     this.points.removeFromParent();
     this.points.geometry.dispose();
     (this.points.material as THREE.Material).dispose();
+  }
+
+  /** Respingo no ponto dado (ex.: tomate acertando): partículas que se espalham e caem. */
+  burst(at: THREE.Vector3Like, color: number, count = 14): void {
+    const c = this.tmpColor.setHex(color);
+    for (let n = 0; n < count; n++) {
+      const i = this.next;
+      this.next = (this.next + 1) % MAX;
+      const k = i * 3;
+      this.pos[k] = at.x;
+      this.pos[k + 1] = at.y;
+      this.pos[k + 2] = at.z;
+      this.vel[k] = (Math.random() - 0.5) * 6;
+      this.vel[k + 1] = 1 + Math.random() * 3;
+      this.vel[k + 2] = (Math.random() - 0.5) * 6;
+      this.col[i * 4] = c.r;
+      this.col[i * 4 + 1] = c.g;
+      this.col[i * 4 + 2] = c.b;
+      this.age[i] = 0;
+      this.life[i] = 0.5 + Math.random() * 0.4;
+      this.alpha0[i] = 0.9;
+    }
   }
 
   private emit(model: CarModel, color: THREE.Color, alpha: number, life: number): void {

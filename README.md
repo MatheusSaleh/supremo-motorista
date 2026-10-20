@@ -18,6 +18,8 @@ o humor do passageiro. É uma sátira; ninguém real aparece no jogo.
   gorjeta, bônus por salto/derrapagem e multas por batidas, postes derrubados e mergulhos no lago.
 - Explorar a cidade: Esplanada e Praça dos Três Poderes, Lago Paranoá com orla e Lago Sul, Eixão com
   tesourinhas e superquadras, Rodoviária e feira, aeroporto, Ponte JK e outros marcos.
+- Fugir dos **Vermelhos** e dos **Amarelos**, facções fictícias que perseguem o carro oficial pelas ruas
+  (com tomates) quando a polarização esquenta nos territórios deles.
 - Jogar com o **clima, a hora e os feriados reais de Brasília**: chuva molha a pista e tira aderência, a
   noite acende postes, janelas e faróis, feriado dobra a gorjeta. O relevo também é o real.
 - Câmera interna com as mãos do motorista no volante, minimapa, controles de toque e versão desktop.
@@ -81,7 +83,7 @@ No celular/tablet aparecem controles de toque.
 O jogo é uma sátira e segue estas regras (valem para qualquer contribuição):
 
 - **Tudo é fictício:** nada de nomes reais de pessoas, partidos, bancos ou processos. O tribunal é "o
-  Tribunal"; os grupos políticos são só **Azuis** e **Vermelhos**; o banqueiro é o **Dr. Rubens Caixeta**, do
+  Tribunal"; os grupos políticos são só **Vermelhos** e **Amarelos**; o banqueiro é o **Dr. Rubens Caixeta**, do
   **Banco Confiança S.A.**
 - **Marcos e instituições reais** (Congresso, TST, PGR, Torre de TV…) podem aparecer com o nome real **só
   como cenário**: nunca em corridas, manchetes, falas ou piadas.

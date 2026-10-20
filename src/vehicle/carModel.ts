@@ -101,6 +101,7 @@ export function createProceduralCarModel(wheelRadius: number): CarModel {
     setLights: (brake) => (taillight.emissiveIntensity = brake ? 2.2 : 0.6),
     setEnvironment: () => {},
     setDirt: () => {},
+    setPaint: (color) => paint.color.setHex(color),
     dent: () => {},
     repair: () => {},
   };

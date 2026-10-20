@@ -173,6 +173,23 @@ em [ASSETS.md](ASSETS.md).
   `pt-BR.rides.ts` e `pt-BR.environment.ts`.
 - **`RideVisuals.ts`:** farol do ponto, seta 3D e o passageiro acenando.
 
+## Facções e perseguidores (`src/factions/`, `src/data/factions.ts`, `src/world/RoadGraph.ts`)
+
+- **`data/factions.ts`:** facções (cores), territórios (retângulos no mapa), regras da polarização
+  (`POLARIZATION`), comportamento dos perseguidores (`PURSUIT`), limite por qualidade (`MAX_PURSUERS`) e os
+  modelos da frota usados por eles.
+- **`RoadGraph`:** grafo das ruas, montado dos eixos das pistas que o `CityBuilder` registra
+  (`roadSegments`, mais `navLink` para viadutos e a ponte). Divide nos cruzamentos e nos "T" e em trechos de
+  até 100 m. `path()` é um A*.
+- **`Polarization`:** calor por facção. Recebe a situação a cada frame e eventos (props derrubados, batidas,
+  entregas, fugas).
+- **`Pursuers`:** pool de carros criado no carregamento (corpos desligados e invisíveis fora de cena; a
+  pintura troca com `CarModel.setPaint`). `think()` roda antes da física: decide quem entra ou sai e
+  calcula os controles de cada carro (rota pelo grafo longe; direto no alvo perto). Os tomates são
+  projéteis visuais com estouro de partículas.
+- O pool é mostrado durante o `compileAsync` do carregamento, para os materiais já estarem compilados no
+  primeiro surgimento.
+
 ## Ambiente real (`src/env/`)
 
 | Arquivo | Papel |

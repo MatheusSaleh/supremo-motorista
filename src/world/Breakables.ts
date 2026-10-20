@@ -11,6 +11,8 @@ export type PropKind = 'pole' | 'tree' | 'sign';
 export interface BreakEvent {
   kind: PropKind;
   position: THREE.Vector3;
+  /** Carro que derrubou (o do jogador ou um perseguidor). */
+  body: RAPIER.RigidBody;
 }
 
 type Visual = { mesh: THREE.InstancedMesh; index: number } | { object: THREE.Mesh };
@@ -92,16 +94,19 @@ export class Breakables {
   }
 
   /** Processa os eventos do passo de física; retorna o que quebrou. */
-  handleEvents(queue: RAPIER.EventQueue, carBody: RAPIER.RigidBody): BreakEvent[] {
+  handleEvents(queue: RAPIER.EventQueue): BreakEvent[] {
     const out: BreakEvent[] = [];
     queue.drainCollisionEvents((h1, h2, started) => {
       if (!started) return;
       const p = this.bySensor.get(h1) ?? this.bySensor.get(h2);
       if (!p || p.broken) return;
-      const v = carBody.linvel();
+      // O outro colisor é o de um carro (o sensor só detecta o grupo CAR).
+      const body = this.physics.getCollider(this.bySensor.has(h1) ? h2 : h1)?.parent();
+      if (!body) return;
+      const v = body.linvel();
       if (Math.hypot(v.x, v.z) < 2.5) return; // encostar devagar não derruba
       this.breakProp(p, v);
-      out.push({ kind: p.kind, position: p.base.clone() });
+      out.push({ kind: p.kind, position: p.base.clone(), body });
     });
     return out;
   }

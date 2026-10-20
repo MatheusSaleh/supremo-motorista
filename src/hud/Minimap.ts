@@ -7,6 +7,40 @@ export interface MinimapActor {
   x: number;
   z: number;
   yaw: number;
+  /** Cor da seta (outros atores; ex.: perseguidores da facção). */
+  color?: string;
+}
+
+/** Área colorida pintada sobre a imagem do minimapa (ex.: territórios das facções). */
+export interface MinimapZone {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+  color: string;
+}
+
+/** Pinta zonas semitransparentes, com contorno tracejado, sobre a imagem já capturada do mapa. */
+export function paintZones(image: HTMLCanvasElement, bounds: LevelBounds, zones: readonly MinimapZone[]): void {
+  const ctx = image.getContext('2d')!;
+  const sx = image.width / (bounds.maxX - bounds.minX);
+  const sz = image.height / (bounds.maxZ - bounds.minZ);
+  for (const z of zones) {
+    const x = (z.minX - bounds.minX) * sx;
+    const y = (z.minZ - bounds.minZ) * sz;
+    const w = (z.maxX - z.minX) * sx;
+    const h = (z.maxZ - z.minZ) * sz;
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = z.color;
+    ctx.fillRect(x, y, w, h);
+    ctx.globalAlpha = 0.85;
+    ctx.strokeStyle = z.color;
+    ctx.lineWidth = Math.max(2, image.width / 600);
+    ctx.setLineDash([8, 6]);
+    ctx.strokeRect(x, y, w, h);
+  }
+  ctx.globalAlpha = 1;
+  ctx.setLineDash([]);
 }
 
 /**
@@ -183,7 +217,7 @@ export class Minimap {
     for (const o of others) {
       const p = toScreen(o.x, o.z);
       if (Math.hypot(p.x, p.y) > r - 6) continue;
-      this.drawArrow(p.x, p.y, Math.PI - o.yaw + rot, '#4fc3ff', 5);
+      this.drawArrow(p.x, p.y, Math.PI - o.yaw + rot, o.color ?? '#4fc3ff', 5);
     }
 
     // Alvos (corridas): dentro do círculo, um alvo; fora, uma seta presa na borda apontando para ele.

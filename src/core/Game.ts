@@ -10,7 +10,7 @@ import { PlayerAudio } from '../audio/PlayerAudio';
 import { CameraRig } from '../camera/CameraRig';
 import { Hud } from '../hud/Hud';
 import { TouchControls, isTouchDevice } from '../hud/TouchControls';
-import { bakeMinimapImage } from '../hud/Minimap';
+import { bakeMinimapImage, paintZones } from '../hud/Minimap';
 import { Avatar } from '../player/Avatar';
 import { loadCharacterAsset, type CharacterAsset } from '../player/CharacterAsset';
 import { Player, type MoveIntent } from '../player/Player';
@@ -21,6 +21,10 @@ import { loadCarAsset, type CarAsset } from '../vehicle/CarVisual';
 import { DEFAULT_VEHICLE, FLEET, type VehicleDef } from '../data/vehicles';
 import { Atmosphere } from '../env/Atmosphere';
 import { Environment, type EnvSnapshot } from '../env/Environment';
+import { FACTIONS, MAX_PURSUERS, POLARIZATION, PURSUER_MODELS, TERRITORIES, other, type Territory } from '../data/factions';
+import { Polarization } from '../factions/Polarization';
+import { Pursuers, type PursuitEvent } from '../factions/Pursuers';
+import { RoadGraph } from '../world/RoadGraph';
 import { SeatedDriver } from '../player/SeatedDriver';
 import { World } from '../world/World';
 import { createCity } from '../world/city';
@@ -65,6 +69,12 @@ export class Game {
   /** Hora, clima e feriados reais de Brasília (e o efeito deles no visual/física). */
   readonly env: Environment;
   private readonly atmosphere: Atmosphere;
+  /** Fase 8: ruas para a IA, polarização das facções e os carros que perseguem o oficial. */
+  readonly roadGraph: RoadGraph | null;
+  readonly polarization = new Polarization();
+  readonly pursuers: Pursuers;
+  private territory: Territory | null = null;
+  private immunityTimer = 0;
   private envTimer = 0;
   private envKey = '';
   private envHud: { text: string; badge: string | null } = { text: '', badge: null };
@@ -119,7 +129,8 @@ export class Game {
     const audio = new AudioSystem();
 
     progress.set('physics', 0, t('loading.physics'));
-    const [, character, level, , carAssets] = await Promise.all([
+    const lowQuality = ['baixa', 'media'].includes(loadSettings().quality);
+    const [, character, level, , carAssets, pursuerAssets] = await Promise.all([
       RAPIER.init().then(() => progress.set('physics', 1)),
       loadCharacterAsset(assets, cfg, (f) => progress.set('character', f, t('loading.character')))
         .catch((err: unknown) => {
@@ -138,7 +149,7 @@ export class Game {
         const list = await Promise.all(
           FLEET.map((def) =>
             // Qualidade Baixa/Média: modelos leves.
-            loadCarAsset(assets, ['baixa', 'media'].includes(loadSettings().quality) ? def.model.lq : def.model.hq)
+            loadCarAsset(assets, lowQuality ? def.model.lq : def.model.hq)
               .catch((err: unknown) => {
                 console.warn(`[game] falha ao carregar o modelo de ${def.id}; usando o sedã procedural.`, err);
                 return null;
@@ -148,16 +159,37 @@ export class Game {
         );
         return new Map(FLEET.map((def, i) => [def.id, list[i]] as const));
       })(),
+      // Perseguidores: sempre os modelos leves da frota (na qualidade Baixa/Média, os mesmos já carregados).
+      lowQuality
+        ? Promise.resolve(null)
+        : Promise.all(
+            PURSUER_MODELS.map((id) => {
+              const def = FLEET.find((d) => d.id === id);
+              return def ? loadCarAsset(assets, def.model.lq).catch(() => null) : Promise.resolve(null);
+            }),
+          ),
     ]);
 
     progress.set('build', 0, t('loading.colliders'));
     await nextFrame();
-    const game = new Game(container, hudRoot, cfg, assets, character, level, audio, carAssets);
+    const game = new Game(
+      container,
+      hudRoot,
+      cfg,
+      assets,
+      character,
+      level,
+      audio,
+      carAssets,
+      pursuerAssets ?? PURSUER_MODELS.map((id) => carAssets.get(id) ?? null),
+    );
     progress.set('build', 1, t('loading.graphics'));
     await nextFrame();
     // Compila os shaders antes do primeiro frame (evita travadas ao começar a andar), em paralelo
     // quando o navegador suporta. O minimapa é capturado depois, já com o jogo rodando (start()).
+    game.pursuers.setCompileVisible(true); // compila os materiais dos perseguidores agora, não no 1º surgimento
     await game.renderer.compileAsync(game.world.scene, game.camera);
+    game.pursuers.setCompileVisible(false);
     progress.set('shaders', 1, t('loading.ready'));
     return game;
   }
@@ -171,6 +203,7 @@ export class Game {
     level: Level,
     readonly audio: AudioSystem,
     carAssets: Map<string, CarAsset | null>,
+    pursuerAssets: (CarAsset | null)[],
   ) {
     this.settings = loadSettings();
 
@@ -202,13 +235,15 @@ export class Game {
     Object.assign(this.safeCar, { x: home.position.x, y: home.position.y, z: home.position.z, yaw: home.yaw });
     Object.assign(this.safePlayer, { x: level.spawn.x, y: level.spawn.y, z: level.spawn.z, yaw: level.spawnYaw });
     this.carEffects = new CarEffects(this.world.scene);
+    this.roadGraph = level.roads?.length ? new RoadGraph(level.roads) : null;
+    this.pursuers = new Pursuers(this.physics, cfg, this.world.scene, pursuerAssets, this.roadGraph, this.world, audio, this.carEffects);
     this.env = new Environment(this.settings.realWorld);
     this.atmosphere = new Atmosphere(this.world, audio);
-    this.atmosphere.attachCar(this.car, this.cars);
+    this.atmosphere.attachCar(this.car, this.allCars);
     // Reflexos só nos carros (ambiente pré-filtrado gerado uma vez; o resto da cena não paga nada).
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    for (const c of this.cars) c.model.setEnvironment(env);
+    for (const c of [...this.cars, ...this.pursuers.all]) c.model.setEnvironment(env);
     pmrem.dispose();
     this.driver = character ? new SeatedDriver(character, cfg) : null;
     if (this.driver) this.car.model.seat.add(this.driver.root);
@@ -245,6 +280,7 @@ export class Game {
     this.rides = new RideManager(level, this.world.scene, this.car.model.rearSeat, character, cfg, {
       sound: (id) => audio.play(id),
       toast: (text) => this.showToast(text, 3, 'info'),
+      delivered: (f) => this.polarization.delivered(f),
     });
     this.rides.setVehicle(this.car);
 
@@ -273,6 +309,7 @@ export class Game {
       ...this.cars.map((c) => c.model.root),
     ]);
     this.world.update(this.localPlayer.position, this.camera.position);
+    paintZones(image, level.bounds, TERRITORIES.map((tr) => ({ ...tr, color: FACTIONS[tr.faction].css })));
     this.hud.setMinimapImage(image);
   }
 
@@ -335,6 +372,7 @@ export class Game {
     this.localPlayer.dispose();
     for (const c of this.cars) c.dispose();
     this.carEffects.dispose();
+    this.pursuers.dispose();
     this.atmosphere.dispose();
     this.rides.dispose();
     this.driver?.dispose();
@@ -375,6 +413,12 @@ export class Game {
       car: driving ? { speedKmh: this.car.speedKmh, turbo: this.car.turbo, turboActive: this.car.turboActive } : null,
       prompt: this.currentPrompt(),
       env: this.envHud,
+      polar: {
+        heat: this.polarization.heat,
+        territory: this.territory ? { text: t('hud.territory', { faction: t(FACTIONS[this.territory.faction].nameKey), name: t(this.territory.nameKey) }), color: FACTIONS[this.territory.faction].css } : null,
+        pursuers: this.pursuers.count,
+      },
+      others: this.pursuers.actors(),
     });
     this.renderer.render(this.world.scene, this.camera);
 
@@ -406,6 +450,9 @@ export class Game {
       if (this.input.consumePressed('Space')) this.localPlayer.requestJump();
     }
 
+    // Perseguidores decidem (com as posições do frame anterior) antes da física.
+    const pursuit = this.pursuers.think(dt, this.car, this.polarization, this.camera, MAX_PURSUERS[this.settings.quality]);
+
     // 2) Física em passo fixo
     this.physics.gravity = { x: 0, y: -this.cfg.physics.gravity, z: 0 };
     this.accumulator += dt;
@@ -413,13 +460,18 @@ export class Game {
     while (this.accumulator >= step && steps < this.cfg.physics.maxSubSteps) {
       if (!driving) this.localPlayer.fixedUpdate(step, this.intent);
       for (const c of this.cars) c.fixedUpdate(step, driving && c === this.car ? this.carControls : this.parkedControls);
+      this.pursuers.fixedUpdate(step);
       this.physics.step(this.events);
-      for (const e of this.world.breakables.handleEvents(this.events, this.car.body)) {
-        this.framePropsBroken++;
-        this.car.knockedProp(e.kind === 'tree' ? 0.82 : 0.9);
+      for (const e of this.world.breakables.handleEvents(this.events)) {
         this.audio.play(e.kind === 'tree' ? 'impactWood' : 'impactMedium', { position: e.position });
+        const car = this.cars.find((c) => c.body === e.body) ?? this.pursuers.carOf(e.body);
+        car?.knockedProp(e.kind === 'tree' ? 0.82 : 0.9);
+        if (e.body !== this.car.body) continue; // perseguidor: só o tranco
+        this.framePropsBroken++;
+        this.polarization.propBroken(e.position.x, e.position.z);
       }
       for (const c of this.cars) c.postStep();
+      this.pursuers.postStep();
       this.accumulator -= step;
       steps++;
     }
@@ -440,6 +492,8 @@ export class Game {
     if (carEvents.some((e) => e.type === 'impact' && e.strength > 3)) this.car.damaged = true;
     // Carros parados: só o visual dos amassados (sem som/corrida), se alguém os empurrar.
     for (const c of this.cars) if (c !== this.car) this.carEffects.handleEvents(c.drainEvents(), c.model);
+    for (const c of this.pursuers.active) this.carEffects.handleEvents(c.drainEvents(), c.model);
+    this.updateFactions(dt, driving, pursuit);
     this.carEffects.update(dt, this.car, this.car.model);
     this.car.model.updateInterior(this.car.steerAngle, this.car.speedKmh, this.carAudio.engineRpm);
     // Mãos no volante (IK): precisa das matrizes do carro já na posição deste frame.
@@ -452,6 +506,7 @@ export class Game {
 
     // 3) Animação / interpolação visual
     for (const c of this.cars) c.update(alpha);
+    this.pursuers.update(alpha);
     if (driving) {
       const p = this.car.position;
       this.localPlayer.followExternal(p.x, p.y, p.z, this.car.heading);
@@ -496,7 +551,7 @@ export class Game {
     if (this.driver) car.model.seat.add(this.driver.root);
     this.carAudio.setCar(car);
     this.rides.setVehicle(car);
-    this.atmosphere.attachCar(car, this.cars);
+    this.atmosphere.attachCar(car, this.allCars);
     const p = car.position;
     Object.assign(this.safeCar, { x: p.x, y: this.groundAt(p.x, p.z), z: p.z, yaw: car.heading });
   }
@@ -540,11 +595,58 @@ export class Game {
     this.input.reset();
   }
 
+  /** Carros do jogador e perseguidores (luzes, clima, reflexos). */
+  private get allCars(): Car[] {
+    return [...this.cars, ...this.pursuers.all];
+  }
+
+  /** Polarização, território atual e o que os perseguidores fizeram neste frame. */
+  private updateFactions(dt: number, driving: boolean, pursuit: readonly PursuitEvent[]): void {
+    const p = this.car.position;
+    this.polarization.update({
+      dt,
+      x: p.x,
+      z: p.z,
+      driving,
+      kmh: this.car.speedKmh,
+      horn: driving && this.input.isDown('KeyH'),
+      passenger: this.rides.aboardFaction,
+      chasing: (f) => this.pursuers.chasing(f),
+    });
+    // Entrou num território (só avisa na entrada).
+    const here = this.polarization.territory;
+    if (here && here !== this.territory) {
+      const aboard = this.rides.aboardFaction;
+      const name = t(FACTIONS[here.faction].nameKey);
+      const hostile = aboard && aboard !== here.faction;
+      this.showToast(hostile ? t('toast.territory.hostile', { faction: name, rival: t(FACTIONS[other(here.faction)].nameKey) }) : t('toast.territory.enter', { faction: name }), 3.5, 'info');
+      this.rides.enteredTerritory(here.faction);
+    }
+    this.territory = here;
+
+    for (const e of pursuit) {
+      const name = t(FACTIONS[e.faction].nameKey);
+      if (e.type === 'spawn') {
+        this.showToast(t('toast.pursuit.start', { faction: name }), 3, 'error');
+        this.rides.pursuitStarted();
+      } else if (e.type === 'escape') {
+        this.polarization.escaped(e.faction);
+        this.showToast(t('toast.pursuit.escape', { faction: name }), 3, 'info');
+        this.rides.pursuerEscaped();
+      } else if (e.type === 'tomato') {
+        this.rides.tomatoHit();
+      } else if (e.type === 'ram') {
+        // Só conta quando é o jogador que parte para cima (não quando apanha parado).
+        if (this.car.speedKmh > POLARIZATION.hitMinKmh) this.polarization.hitFactionCar(e.faction);
+      }
+    }
+  }
+
   /** Hora/clima/feriado: visual e física a cada frame; HUD, corridas e avisos uma vez por segundo. */
   private updateEnvironment(dt: number): void {
     this.env.update(dt);
     const s = this.env.snapshot();
-    this.atmosphere.update(dt, s, this.camera.position, this.cars, this.carEffects, this.mode === 'driving');
+    this.atmosphere.update(dt, s, this.camera.position, this.allCars, this.carEffects, this.mode === 'driving');
     this.envTimer -= dt;
     if (this.envTimer > 0) return;
     this.envTimer = 1;
@@ -696,6 +798,12 @@ export class Game {
     const parked = garage && Math.hypot(p.x - garage.x, p.z - garage.z) < 26 && Math.abs(this.car.forwardSpeed) < 1;
     const needsService = this.car.dirt > 0.05 || this.car.damaged;
     this.serviceTimer = parked && needsService ? this.serviceTimer + dt : 0;
+    // Imunidade do Tribunal: parado na garagem, a polarização zera e os perseguidores vão embora.
+    this.immunityTimer = parked && this.mode === 'driving' ? this.immunityTimer + dt : 0;
+    if (this.immunityTimer > 1.5) {
+      this.immunityTimer = -Infinity; // uma vez por parada
+      if (this.polarization.reset()) this.showToast(t('toast.garage.immunity'), 3, 'info');
+    }
     if (this.serviceTimer > 1.5) {
       this.serviceTimer = 0;
       this.carEffects.repair(this.car);

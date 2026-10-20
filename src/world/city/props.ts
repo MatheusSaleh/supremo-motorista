@@ -3,7 +3,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { inRect, instancedChunked, placeMatrix, type CityBuilder, type Rect } from './builder';
-import { canvasTexture } from './materials';
+import { canvasTexture, factionFlagMaterial } from './materials';
+import { TERRITORIES, type FactionId } from '../../data/factions';
 
 /** Distâncias de desenho (m, na qualidade média; ver World.cullDetail). */
 export const DRAW = { trees: 700, lamps: 800, signs: 320, boards: 500, stalls: 900 };
@@ -192,4 +193,41 @@ export function buildBounds(b: CityBuilder, r: Rect): void {
 function breakable(mesh: THREE.InstancedMesh, kind: 'pole' | 'tree', prefix: string): void {
   mesh.userData.breakKind = kind;
   mesh.userData.breakIds = Array.from({ length: mesh.count }, (_, i) => `${prefix}-${i}`);
+}
+
+/**
+ * Bandeiras das facções ao longo das ruas de cada território (a cada `spacing` metros, dos dois lados):
+ * mostram de longe onde começa o território dos Vermelhos ou dos Amarelos.
+ */
+export function buildFactionFlags(b: CityBuilder, spacing = 55): void {
+  const byFaction = new Map<FactionId, THREE.Matrix4[]>();
+  for (const s of b.roadSegments) {
+    const len = Math.hypot(s.x2 - s.x1, s.z2 - s.z1);
+    const dx = (s.x2 - s.x1) / len;
+    const dz = (s.z2 - s.z1) / len;
+    for (let d = spacing / 2; d < len; d += spacing) {
+      for (const side of [-1, 1]) {
+        const off = s.width / 2 + 4.5;
+        const x = s.x1 + dx * d - dz * side * off;
+        const z = s.z1 + dz * d + dx * side * off;
+        const terr = TERRITORIES.find((tr) => x > tr.minX && x < tr.maxX && z > tr.minZ && z < tr.maxZ);
+        if (!terr || b.roadRects.some((r) => inRect(r, x, z))) continue;
+        // Bandeira de frente para a rua.
+        const list = byFaction.get(terr.faction) ?? [];
+        list.push(placeMatrix(x, 0, z, Math.atan2(dx, dz)));
+        byFaction.set(terr.faction, list);
+      }
+    }
+  }
+  const pole = new THREE.CylinderGeometry(0.05, 0.07, 6, 6).translate(0, 3, 0);
+  const cloth = new THREE.PlaneGeometry(1.8, 1.1).translate(0.95, 5.3, 0);
+  for (const [faction, matrices] of byFaction) {
+    const poles = instancedChunked(b, b.root, pole, b.mats.signPost, matrices, undefined, 'mastros');
+    const flags = instancedChunked(b, b.root, cloth, factionFlagMaterial(faction), matrices, undefined, `bandeiras-${faction}`);
+    for (const m of [...poles, ...flags]) {
+      m.userData.noCollision = true;
+      m.userData.cullDistance = DRAW.signs;
+      m.castShadow = false;
+    }
+  }
 }

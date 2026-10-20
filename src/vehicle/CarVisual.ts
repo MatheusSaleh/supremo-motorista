@@ -27,6 +27,8 @@ export interface CarModel {
   setEnvironment(env: THREE.Texture): void;
   /** 0 = limpo … 1 = imundo. */
   setDirt(amount: number): void;
+  /** Troca a cor da pintura (carros das facções). */
+  setPaint(color: number): void;
   /** Amassa a lataria: ponto e direção (espaço do carro) de onde veio a pancada. */
   dent(fromDir: THREE.Vector3, strength: number): void;
   repair(): void;
@@ -208,6 +210,7 @@ export function createCarModelFromAsset(asset: CarAsset, paintColor: number | nu
   }
   const cleanColor = paint?.color.clone() ?? new THREE.Color();
   const dirtColor = new THREE.Color(0x5b5240);
+  let dirtAmount = 0;
   const taillight = byName('taillight');
 
   // Luzes de ré: dois retângulos brancos ao lado das lanternas (posição tirada da própria geometria).
@@ -267,8 +270,13 @@ export function createCarModelFromAsset(asset: CarAsset, paintColor: number | nu
       }
     },
     setDirt(amount) {
+      dirtAmount = amount;
       paint?.color.copy(cleanColor).lerp(dirtColor, Math.min(1, amount) * 0.75);
       if (paint) paint.roughness = 0.28 + amount * 0.6;
+    },
+    setPaint(color) {
+      cleanColor.setHex(color);
+      this.setDirt(dirtAmount);
     },
     dent(fromDir, strength) {
       // Ponto de impacto: onde a direção da pancada encontra a caixa da lataria, à meia altura.

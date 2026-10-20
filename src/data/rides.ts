@@ -4,6 +4,7 @@
 // Regra de conteúdo: corridas só usam endereços dos pools abaixo (setores fictícios). Marcos reais
 // (TST, PGR, PF, QG, Planalto, Catedral…) são só cenário e NUNCA entram como origem ou destino.
 import type { StringKey } from '../core/i18n';
+import type { FactionId } from './factions';
 
 /** Arquétipos (comportamentos próprios chegam na Fase 10). */
 export type Archetype = 'orador' | 'palestrante' | 'novato' | 'presidente' | 'discreto';
@@ -12,14 +13,16 @@ export interface Passenger {
   id: string;
   nameKey: StringKey;
   archetype: Archetype;
+  /** Simpatia por uma das facções fictícias (null = neutro). Mexe com a polarização. */
+  faction: FactionId | null;
 }
 
 export const PASSENGERS: Passenger[] = [
-  { id: 'tiburcio', nameKey: 'passenger.tiburcio', archetype: 'orador' },
-  { id: 'clotilde', nameKey: 'passenger.clotilde', archetype: 'palestrante' },
-  { id: 'anselmo', nameKey: 'passenger.anselmo', archetype: 'novato' },
-  { id: 'dulce', nameKey: 'passenger.dulce', archetype: 'presidente' },
-  { id: 'euclides', nameKey: 'passenger.euclides', archetype: 'discreto' },
+  { id: 'tiburcio', nameKey: 'passenger.tiburcio', archetype: 'orador', faction: 'vermelhos' },
+  { id: 'clotilde', nameKey: 'passenger.clotilde', archetype: 'palestrante', faction: 'amarelos' },
+  { id: 'anselmo', nameKey: 'passenger.anselmo', archetype: 'novato', faction: null },
+  { id: 'dulce', nameKey: 'passenger.dulce', archetype: 'presidente', faction: 'amarelos' },
+  { id: 'euclides', nameKey: 'passenger.euclides', archetype: 'discreto', faction: 'vermelhos' },
 ];
 
 /** Pools de endereços (prefixos de id de AddressPoint). */
@@ -126,7 +129,13 @@ export type LineTrigger =
   | 'rain'
   | 'dry'
   | 'holiday'
-  | 'night';
+  | 'night'
+  // Facções (Fase 8).
+  | 'chase'
+  | 'tomato'
+  | 'escape'
+  | 'hostile'
+  | 'friendly';
 
 /** Quantas variações de cada fala existem no i18n (chaves line.<gatilho>.<n>). */
 export const LINE_COUNTS: Record<LineTrigger, number> = {
@@ -146,4 +155,9 @@ export const LINE_COUNTS: Record<LineTrigger, number> = {
   dry: 4,
   holiday: 3,
   night: 3,
+  chase: 4,
+  tomato: 3,
+  escape: 3,
+  hostile: 3,
+  friendly: 2,
 };

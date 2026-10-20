@@ -40,6 +40,15 @@ export interface SignSpec {
 
 export type RoadKind = 'main' | 'local';
 
+/** Eixo de um trecho dirigível (pista, viaduto, ponte), para o grafo de navegação da IA. */
+export interface RoadSegment {
+  x1: number;
+  z1: number;
+  x2: number;
+  z2: number;
+  width: number;
+}
+
 export class CityBuilder {
   readonly root = new THREE.Group();
   readonly mats: Materials = createMaterials();
@@ -48,6 +57,8 @@ export class CityBuilder {
   readonly occupied: Rect[] = [];
   /** Só as pistas (postes não podem cair em cima de outra pista). */
   readonly roadRects: Rect[] = [];
+  /** Eixos das pistas e ligações (viadutos, ponte), para a IA dirigir pelas ruas (world/RoadGraph). */
+  readonly roadSegments: RoadSegment[] = [];
   readonly lampLines: LampLine[] = [];
   readonly landmarks: Landmark[] = [];
   readonly addresses: AddressPoint[] = [];
@@ -138,6 +149,7 @@ export class CityBuilder {
 
     const r = alongZ ? rectOf(cx, cz, width, length) : rectOf(cx, cz, length, width);
     this.roadRects.push(r);
+    this.roadSegments.push({ x1, z1, x2, z2, width });
     this.occupy({ minX: r.minX - 3, maxX: r.maxX + 3, minZ: r.minZ - 3, maxZ: r.maxZ + 3 });
 
     const off = width / 2 + 2.5;
@@ -147,6 +159,11 @@ export class CityBuilder {
       else this.lampLines.push({ x1, z1: z1 + s * off, x2, z2: z2 + s * off });
     }
     return m;
+  }
+
+  /** Trecho dirigível que não é uma pista comum (viaduto, ponte): só entra no grafo de navegação. */
+  navLink(x1: number, z1: number, x2: number, z2: number, width: number): void {
+    this.roadSegments.push({ x1, z1, x2, z2, width });
   }
 
   /**

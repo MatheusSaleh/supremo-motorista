@@ -15,6 +15,8 @@ export function buildEixao(b: CityBuilder): void {
   // Trechos planos entre as tesourinhas.
   const stops = [EIXAO.minX, ...EIXAO.tesourinhas.flatMap((x) => [x - half, x + half]), EIXAO.maxX];
   for (let i = 0; i < stops.length; i += 2) b.road(g, 'main', stops[i], z, stops[i + 1], z, 'both');
+  // Por cima das lombadas-viaduto: liga os trechos planos no grafo de navegação.
+  for (const x of EIXAO.tesourinhas) b.navLink(x - half, z, x + half, z, ROAD.main);
 
   EIXAO.tesourinhas.forEach((xc, i) => buildTesourinha(b, g, xc, i + 1));
   buildSuperquadras(b);

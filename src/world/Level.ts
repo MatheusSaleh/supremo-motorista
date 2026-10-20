@@ -2,6 +2,7 @@
 // World só precisa de um Level; trocar esplanada.ts por um .glb do Blosm não afeta mais nada.
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { RoadSegment } from './city/builder';
 
 export interface Landmark {
   name: string;
@@ -48,6 +49,8 @@ export interface Level {
   water: WaterArea[];
   /** Altura do chão em (x, z) (relevo); sem ela, o chão é plano em y = 0. */
   heightAt?: (x: number, z: number) => number;
+  /** Eixos das ruas dirigíveis (a IA navega por elas); sem eles, a IA vai direto ao alvo. */
+  roads?: RoadSegment[];
 }
 
 /**

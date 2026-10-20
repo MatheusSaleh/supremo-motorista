@@ -13,7 +13,7 @@ Saleh. Também estão reservados os personagens próprios e seus nomes:
 - o Dr. Rubens Caixeta;
 - o Banco Confiança S.A.;
 - os carros com nomes paródia;
-- os Azuis e os Vermelhos.
+- os Vermelhos e os Amarelos.
 
 Você **não pode** usá-los para lançar, vender ou divulgar outro jogo ou produto, nem dar a entender que um
 trabalho derivado é o jogo oficial. Um fork precisa ter outro nome.

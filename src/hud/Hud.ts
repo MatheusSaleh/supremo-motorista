@@ -6,6 +6,7 @@ import type { Settings } from '../core/Settings';
 import type { Level } from '../world/Level';
 import type { RideView } from '../rides/RideManager';
 import { Minimap, type MinimapActor } from './Minimap';
+import { FACTIONS, FACTION_IDS, type FactionId } from '../data/factions';
 import { RideHud } from './RideHud';
 import { renderControls, type HudMode } from './controls';
 import { PauseMenu, type PauseMenuCallbacks } from './PauseMenu';
@@ -29,6 +30,8 @@ export interface HudFrame {
   bubbleAt?: { x: number; y: number } | null;
   /** Clima e hora de Brasília ("☀ 27°C · 55% · 14:00") e selo de feriado. */
   env?: { text: string; badge: string | null };
+  /** Polarização (calor por facção), território atual e perseguidores em cena. */
+  polar?: { heat: Readonly<Record<FactionId, number>>; territory: { text: string; color: string } | null; pursuers: number };
 }
 
 export class Hud {
@@ -42,6 +45,11 @@ export class Hud {
   private readonly envText: HTMLElement;
   private readonly envBadge: HTMLElement;
   private lastEnv = '';
+  private readonly polarBars: [FactionId, HTMLElement][];
+  private readonly polarBox: HTMLElement;
+  private readonly pursuersLabel: HTMLElement;
+  private readonly territoryLabel: HTMLElement;
+  private lastPolar = '';
   private readonly carPanel: HTMLElement;
   private readonly speed: HTMLElement;
   private readonly turboBar: HTMLElement;
@@ -64,7 +72,14 @@ export class Hud {
       <div class="hud-hint" data-ref="lock">${t('hud.clickToLook')}</div>
       <div class="hud-fps" data-ref="fps" hidden></div>
       <div class="hud-prompt" data-ref="prompt" hidden></div>
-      <div class="hud-env" data-ref="env"><span data-ref="envText"></span><span class="hud-env-badge" data-ref="envBadge" hidden></span></div>
+      <div class="hud-env" data-ref="env"><span data-ref="envText"></span><span class="hud-env-badge" data-ref="envBadge" hidden></span>
+        <div class="hud-polar" data-ref="polar">
+          <div class="hud-polar-title">${t('hud.polarization')}</div>
+          ${FACTION_IDS.map((f) => `<div class="hud-polar-row"><span>${t(FACTIONS[f].nameKey)}</span><div class="hud-polar-track"><div class="hud-polar-bar" data-polar="${f}" style="background:${FACTIONS[f].css}"></div></div></div>`).join('')}
+          <div class="hud-polar-pursuers" data-ref="pursuers" hidden></div>
+        </div>
+        <span class="hud-territory" data-ref="territory" hidden></span>
+      </div>
       <div class="hud-controls" data-ref="controls"></div>
       <div class="hud-car" data-ref="car" hidden>
         <div class="hud-speed"><span data-ref="speed">0</span><small>${t('hud.speedUnit')}</small></div>
@@ -79,6 +94,10 @@ export class Hud {
     this.prompt = q('prompt');
     this.envText = q('envText');
     this.envBadge = q('envBadge');
+    this.polarBox = q('polar');
+    this.pursuersLabel = q('pursuers');
+    this.territoryLabel = q('territory');
+    this.polarBars = FACTION_IDS.map((f) => [f, root.querySelector<HTMLElement>(`[data-polar="${f}"]`)!]);
     this.controls = q('controls');
     this.carPanel = q('car');
     this.speed = q('speed');
@@ -137,6 +156,23 @@ export class Hud {
       this.envText.textContent = f.env.text;
       this.envBadge.textContent = f.env.badge ?? '';
       this.envBadge.hidden = !f.env.badge;
+    }
+
+    if (f.polar) {
+      const p = f.polar;
+      const key = `${FACTION_IDS.map((id) => Math.round(p.heat[id])).join()}|${p.territory?.text}|${p.pursuers}`;
+      if (key !== this.lastPolar) {
+        this.lastPolar = key;
+        for (const [id, bar] of this.polarBars) bar.style.width = `${Math.round(p.heat[id])}%`;
+        this.polarBox.classList.toggle('hot', p.pursuers > 0);
+        this.pursuersLabel.hidden = p.pursuers === 0;
+        this.pursuersLabel.textContent = t('hud.pursuers', { n: p.pursuers });
+        this.territoryLabel.hidden = !p.territory;
+        if (p.territory) {
+          this.territoryLabel.textContent = p.territory.text;
+          this.territoryLabel.style.background = p.territory.color;
+        }
+      }
     }
 
     this.carPanel.hidden = !f.car;

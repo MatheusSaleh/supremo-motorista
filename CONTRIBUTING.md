@@ -49,7 +49,7 @@ O jogo é uma sátira política **totalmente fictícia**. Pull requests que queb
 aceitos:
 
 1. **Nada de nomes reais** de pessoas, partidos, bancos ou processos judiciais. O tribunal é "o Tribunal"; os
-   grupos políticos são só **Azuis** e **Vermelhos**; o banqueiro é o **Dr. Rubens Caixeta**, do **Banco
+   grupos políticos são só **Vermelhos** e **Amarelos**; o banqueiro é o **Dr. Rubens Caixeta**, do **Banco
    Confiança S.A.**
 2. **Marcos e instituições reais** (Congresso, TST, PGR, Torre de TV…) aparecem com o nome real **só como
    cenário**: nunca em corridas, falas, manchetes ou piadas.
