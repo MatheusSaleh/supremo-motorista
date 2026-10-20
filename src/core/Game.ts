@@ -29,6 +29,9 @@ import { FAVORS, SUSPICION } from '../data/banker';
 import { Career, type ShiftEvent } from '../career/Career';
 import { CAR_PRICES, SHIFT, type UpgradeId } from '../data/career';
 import { CareerScreens } from '../hud/CareerScreens';
+import { CAMPAIGN, HEADLINE_VARIANTS, evaluateEnding, headlineKind, type EndingId } from '../data/campaign';
+import { Music, RADIO_PLAYLIST } from '../audio/Music';
+import { desktop } from './desktop';
 import { RoadGraph } from '../world/RoadGraph';
 import { SeatedDriver } from '../player/SeatedDriver';
 import { World } from '../world/World';
@@ -43,6 +46,9 @@ import { ProgressTracker, nextFrame, type ProgressCallback } from './progress';
 import { loadSettings, saveSettings, type Settings } from './Settings';
 
 export type PlayMode = 'onFoot' | 'driving';
+
+/** Marca (sessionStorage) que o jogo recarregou por "Novo jogo": pula o menu e abre o capítulo 1. */
+const NEW_GAME_FLAG = 'supremo.newGame';
 
 /** Distância máxima (m) do centro do carro para conseguir entrar. */
 const ENTER_DISTANCE = 3.4;
@@ -86,7 +92,12 @@ export class Game {
   readonly career: Career;
   private readonly careerScreens: CareerScreens;
   /** Tela da carreira aberta (contracheque ou Oficina): a simulação para, sem abrir o menu de pausa. */
-  private modal: 'summary' | 'workshop' | null = null;
+  private modal: 'summary' | 'workshop' | 'card' | null = null;
+  /** Fase 12: trilha, menu principal (câmera passeando), final pendente e perseguições do dia. */
+  private readonly music: Music;
+  private menuOrbit: number | null = null;
+  private pendingEnding: EndingId | null = null;
+  private dayChases = 0;
   private saveTimer = 30;
   private readonly onUnload = () => this.saveCareer();
   private immunityTimer = 0;
@@ -277,7 +288,12 @@ export class Game {
       hudRoot,
       level,
       this.settings,
-      { onResume: () => this.setPaused(false), onChange: (s) => this.applySettings(s), onNewGame: () => this.newGame() },
+      {
+        onResume: () => this.setPaused(false),
+        onChange: (s) => this.applySettings(s),
+        onNewGame: () => this.newGame(),
+        onToMenu: () => this.toMainMenu(),
+      },
       touch ? new TouchControls(this.input, () => this.setPaused(!this.paused)) : null,
       () => this.rides.accept(),
     );
@@ -322,10 +338,12 @@ export class Game {
         onBuyUpgrade: (id) => this.buyUpgrade(id),
         onBuyCar: (id) => this.buyCar(id),
         onCloseWorkshop: () => this.closeModal(),
+        onCardAct: (act) => this.cardAct(act),
       },
       FLEET.map((d) => ({ id: d.id, nameKey: d.nameKey })),
     );
     this.applyCareer();
+    this.music = new Music(audio);
     window.addEventListener('beforeunload', this.onUnload);
 
     window.addEventListener('resize', this.onResize);
@@ -360,6 +378,16 @@ export class Game {
   start(): void {
     this.timer.connect(document); // pausa o relógio quando a aba fica oculta
     this.renderer.setAnimationLoop((t) => this.frame(t));
+    // Fase 12: menu principal; logo depois de "Novo jogo" (que recarrega a página), direto no capítulo 1.
+    let fresh = false;
+    try {
+      fresh = sessionStorage.getItem(NEW_GAME_FLAG) === '1';
+      sessionStorage.removeItem(NEW_GAME_FLAG);
+    } catch {
+      /* sem storage */
+    }
+    if (fresh) this.showChapter();
+    else this.showMainMenu();
     // A captura renderiza e restaura a cena no mesmo instante; só a leitura dos pixels é assíncrona,
     // então pode acontecer com o jogo já rodando (o minimapa aparece uma fração de segundo depois).
     requestAnimationFrame(() => void this.bakeMinimap());
@@ -443,6 +471,8 @@ export class Game {
 
     if (!this.paused && !this.modal) this.simulate(dt);
     this.careerScreens.updateBadge(this.career, this.rides.money);
+    if (this.menuOrbit !== null) this.orbitCamera(dt);
+    this.updateMusic();
     this.ambientAudio.update(this.camera.position, this.atmosphere.night, this.atmosphere.rainLevel);
     this.updateEnvironment(dt);
 
@@ -687,6 +717,7 @@ export class Game {
       }
       const name = t(FACTIONS[e.faction].nameKey);
       if (e.type === 'spawn') {
+        this.dayChases++;
         this.showToast(t('toast.pursuit.start', { faction: name }), 3, 'error');
         this.rides.pursuitStarted();
       } else if (e.type === 'escape') {
@@ -754,9 +785,25 @@ export class Game {
   private endShift(): void {
     const summary = this.career.closeDay(this.rides.money);
     this.rides.money = summary.balance;
+    // Manchete do dia (Gazeta da Tesourinha) e, na campanha, o final (se chegou a hora).
+    const kind = headlineKind({ ...summary.stats, chases: this.dayChases });
+    const n = 1 + Math.floor(Math.random() * HEADLINE_VARIANTS);
+    const news = { paper: t('news.paper'), title: t(`news.${kind}.${n}` as Parameters<typeof t>[0]) };
+    if (!this.career.campaignDone) {
+      const s = this.suspicion;
+      this.pendingEnding = evaluateEnding(
+        { warnings: this.career.warnings, scandals: s.scandals, favorsAccepted: s.favorsAccepted, favorsDeclined: s.favorsDeclined },
+        SHIFT.maxWarnings,
+        summary.day >= CAMPAIGN.days,
+      );
+      if (this.pendingEnding) {
+        this.career.campaignDone = true;
+        this.career.ending = this.pendingEnding;
+      }
+    }
     this.saveCareer();
     this.audio.play('uiConfirm');
-    this.careerScreens.showSummary(summary);
+    this.careerScreens.showSummary(summary, news);
     this.openModal('summary');
   }
 
@@ -779,7 +826,119 @@ export class Game {
     this.pursuers.clear();
     this.polarization.reset();
     this.rides.resetForNewDay();
+    this.dayChases = 0;
     this.saveCareer();
+    if (this.pendingEnding) {
+      const ending = this.pendingEnding;
+      this.pendingEnding = null;
+      this.showEnding(ending);
+    } else if (!this.career.campaignDone) this.showChapter();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Campanha, menu principal e música (Fase 12)
+
+  private showMainMenu(): void {
+    const c = this.career;
+    const saved = Career.exists();
+    const buttons = [
+      ...(saved ? [{ label: t('menu.continue', { day: c.day }), act: 'continue', primary: true }] : []),
+      { label: t('menu.new'), act: 'new', primary: !saved },
+      { label: t('menu.credits'), act: 'credits' },
+      ...(desktop ? [{ label: t('menu.quit'), act: 'quit' }] : []),
+    ];
+    this.careerScreens.showCard({ title: t('game.title'), kicker: t('game.subtitle'), body: t('menu.subtitle'), buttons, cover: true });
+    this.openModal('card');
+    this.menuOrbit = this.menuOrbit ?? 0;
+  }
+
+  /** Capítulo do dia (antes do expediente começar). */
+  private showChapter(): void {
+    const day = this.career.day;
+    const free = this.career.campaignDone || day > CAMPAIGN.days;
+    this.careerScreens.showCard({
+      kicker: free ? undefined : t('chapter.label', { day, total: CAMPAIGN.days }),
+      title: t(free ? 'chapter.free.title' : (`chapter.${day}.title` as Parameters<typeof t>[0])),
+      body: t(free ? 'chapter.free.body' : (`chapter.${day}.body` as Parameters<typeof t>[0])),
+      footer: t('shift.goal', { done: '0', goal: this.career.goal.toLocaleString('pt-BR') }),
+      buttons: [{ label: t('chapter.start'), act: 'start-day', primary: true }],
+    });
+    this.openModal('card');
+  }
+
+  private showEnding(id: EndingId): void {
+    const s = this.suspicion;
+    this.careerScreens.showCard({
+      kicker: t('ending.label'),
+      title: t(`ending.${id}.title`),
+      body: `<div class="career-news"><div class="career-news-paper">${t('news.paper')}</div><div class="career-news-title">${t(`ending.${id}.headline`)}</div></div>${t(`ending.${id}.body`)}`,
+      footer: t('ending.stats', {
+        days: this.career.day - 1,
+        rides: this.career.totals.rides,
+        favors: s.favorsAccepted,
+        declined: s.favorsDeclined,
+        scandals: s.scandals,
+        money: Math.round(this.rides.money).toLocaleString('pt-BR'),
+      }),
+      buttons: [
+        { label: t('ending.free'), act: 'free', primary: true },
+        { label: t('ending.new'), act: 'new-confirmed' },
+      ],
+    });
+    this.openModal('card');
+  }
+
+  private cardAct(act: string): void {
+    switch (act) {
+      case 'continue':
+        this.closeModal();
+        if (!this.career.started && !this.career.campaignDone) this.showChapter();
+        break;
+      case 'new':
+        if (!Career.exists() || window.confirm(t('menu.newConfirm'))) this.newGame();
+        break;
+      case 'new-confirmed':
+        this.newGame();
+        break;
+      case 'credits':
+        this.careerScreens.showCard({ title: t('credits.title'), body: t('credits.body'), buttons: [{ label: t('menu.back'), act: 'back', primary: true }] });
+        break;
+      case 'back':
+        this.showMainMenu();
+        break;
+      case 'quit':
+        this.saveCareer();
+        desktop?.quit();
+        break;
+      default: // start-day, free
+        this.closeModal();
+    }
+  }
+
+  private toMainMenu(): void {
+    this.saveCareer();
+    this.setPaused(false);
+    this.showMainMenu();
+  }
+
+  /** Menu principal: a câmera passeia devagar sobre a Esplanada. */
+  private orbitCamera(dt: number): void {
+    this.menuOrbit! += dt * 0.04;
+    const a = this.menuOrbit!;
+    const cx = 0;
+    const cz = -420;
+    const ground = this.groundAt(cx, cz);
+    this.camera.position.set(cx + Math.cos(a) * 520, ground + 85, cz + Math.sin(a) * 520);
+    this.camera.lookAt(cx, ground + 25, cz - 180);
+    this.camera.fov = this.cfg.camera.fov;
+    this.camera.updateProjectionMatrix();
+  }
+
+  /** Trilha: tema no menu e nos cartões; rádio no carro; nada a pé. */
+  private updateMusic(): void {
+    if (this.modal === 'card') this.music.play('menu', 0.85);
+    else if (this.mode === 'driving') this.music.playList(RADIO_PLAYLIST, 0.5);
+    else if (this.music.track && this.modal !== 'summary' && this.modal !== 'workshop') this.music.stop();
   }
 
   private buyUpgrade(id: UpgradeId): void {
@@ -805,7 +964,7 @@ export class Game {
     this.careerScreens.showWorkshop(this.career, this.rides.money);
   }
 
-  private openModal(kind: 'summary' | 'workshop'): void {
+  private openModal(kind: 'summary' | 'workshop' | 'card'): void {
     this.modal = kind;
     this.input.reset();
     this.input.exitPointerLock();
@@ -816,6 +975,8 @@ export class Game {
   private closeModal(): void {
     this.careerScreens.hideSummary();
     this.careerScreens.hideWorkshop();
+    this.careerScreens.hideCard();
+    this.menuOrbit = null;
     this.modal = null;
     this.accumulator = 0;
     this.input.reset();
@@ -826,7 +987,11 @@ export class Game {
   /** Teclado nas telas da carreira: Enter continua o dia; Esc/O fecham a Oficina. */
   private modalInput(): void {
     const i = this.input;
-    if (this.modal === 'summary' && (i.consumePressed('Enter') || i.consumePressed('NumpadEnter'))) this.startNextDay();
+    const enter = i.consumePressed('Enter') || i.consumePressed('NumpadEnter');
+    if (this.modal === 'card' && enter) {
+      const act = this.careerScreens.cardDefaultAct;
+      if (act) this.cardAct(act);
+    } else if (this.modal === 'summary' && enter) this.startNextDay();
     else if (this.modal === 'workshop' && (i.consumePressed('Escape') || i.consumePressed('KeyO'))) this.closeModal();
   }
 
@@ -844,6 +1009,11 @@ export class Game {
   private newGame(): void {
     window.removeEventListener('beforeunload', this.onUnload);
     Career.wipe();
+    try {
+      sessionStorage.setItem(NEW_GAME_FLAG, '1');
+    } catch {
+      /* sem storage: abre no menu principal */
+    }
     location.reload();
   }
 

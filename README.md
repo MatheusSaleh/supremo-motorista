@@ -24,6 +24,8 @@ o humor do passageiro. É uma sátira; ninguém real aparece no jogo.
   o Novato medroso ou empolgado, a Presidente com pressa e o Discreto que não quer ser visto.
 - Fazer (ou recusar) "favores" para o banqueiro **Dr. Rubens Caixeta**: pagam muito, mas enchem o
   **Medidor de Suspeição**, atraem a imprensa e podem virar manchete e multa da Corregedoria.
+- Jogar a **campanha de 10 dias**, com capítulos de história, manchetes da Gazeta da Tesourinha e três
+  finais (Motorista Exemplar, Sócio do Caixeta ou Demitido), com trilha de bossa nova e jazz.
 - Fazer carreira: expedientes com meta diária, contracheque, advertências, a **Oficina do Tribunal** para
   melhorar a frota e comprar carros, e o progresso salvo automaticamente.
 - Jogar com o **clima, a hora e os feriados reais de Brasília**: chuva molha a pista e tira aderência, a
@@ -131,7 +133,7 @@ docs/        documentação
 
 Todos os modelos, sons e dados de terceiros, com autor, origem, licença e alterações feitas, estão em
 [CREDITS.md](CREDITS.md). Os modelos de carro e o personagem são CC BY 4.0 (exigem crédito); os sons são
-CC0; clima e relevo vêm do Open-Meteo (CC BY 4.0) e os feriados da BrasilAPI.
+CC0, assim como as músicas; clima e relevo vêm do Open-Meteo (CC BY 4.0) e os feriados da BrasilAPI.
 
 ### Licença
 

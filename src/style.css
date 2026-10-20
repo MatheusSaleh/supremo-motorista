@@ -1070,3 +1070,64 @@ kbd {
   bottom: auto;
   top: 56px;
 }
+
+/* ---------- Campanha (Fase 12) ---------- */
+
+.career-kicker {
+  margin-bottom: 4px;
+  color: #ffd34d;
+  font: 700 12px system-ui, sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.career-body {
+  margin: 8px 0 4px;
+  line-height: 1.5;
+}
+
+.career-panel.cover {
+  width: min(480px, calc(100vw - 32px));
+  text-align: center;
+  background: rgb(16 22 30 / 0.82);
+}
+
+.career-panel.cover h2 {
+  margin: 6px 0 2px;
+  font-size: 40px;
+  letter-spacing: 0.01em;
+}
+
+.career-panel.cover .career-body {
+  margin-bottom: 14px;
+  opacity: 0.85;
+}
+
+.career-panel > button + button {
+  margin-top: 8px;
+}
+
+.career-news {
+  margin: -6px -8px 14px;
+  padding: 10px 14px 12px;
+  border: 3px double #222;
+  background: #f4efe1;
+  color: #1c1c1c;
+  font-family: Georgia, 'Times New Roman', serif;
+  text-align: center;
+  transform: rotate(-1deg);
+}
+
+.career-news-paper {
+  padding-bottom: 4px;
+  border-bottom: 2px solid #222;
+  font: 700 11px system-ui, sans-serif;
+  letter-spacing: 0.14em;
+}
+
+.career-news-title {
+  margin-top: 8px;
+  font-size: 19px;
+  font-weight: 900;
+  line-height: 1.2;
+}

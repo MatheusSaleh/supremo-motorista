@@ -45,6 +45,17 @@ Arquivos marcados com ✂ foram cortados/convertidos (mono, 22 kHz, normalizados
 | `ambient/birds_loop.wav` ✂ | Thimras | OpenGameArt — "Park Ambiences": https://opengameart.org/content/park-ambiences |
 | `ambient/crickets_loop.mp3` | Wolfgang_ (gravação: Ted Kerr) | OpenGameArt — "Crickets Ambient Noise - loopable" (CC0): https://opengameart.org/content/crickets-ambient-noise-loopable |
 
+### Música (`public/audio/music/`)
+
+Todas em domínio público (**CC0 1.0**), tocadas sem alteração.
+
+| Arquivo | Uso | Autor | Origem |
+| --- | --- | --- | --- |
+| `bossa_town.mp3` | tema do menu e dos cartões | KarateStudios | OpenGameArt — "Bossa Town": https://opengameart.org/content/bossa-town |
+| `drive.mp3` | rádio do carro | Zane Little Music | OpenGameArt — "Drive": https://opengameart.org/content/drive-0 |
+| `chill_jazz.mp3` | rádio do carro | Pro Sensory | OpenGameArt — "Chill Jazz": https://opengameart.org/content/chill-jazz |
+| `mad_bossa.ogg` | rádio do carro | Spring Spring | OpenGameArt — "Mad Bossa" (CC0 / OGA-BY 3.0; usada como CC0): https://opengameart.org/content/mad-bossa |
+
 A cantada de pneu não usa arquivo: é ruído filtrado gerado em tempo real (`src/audio/AudioSystem.ts`, `noiseLoop`).
 
 ## Bibliotecas

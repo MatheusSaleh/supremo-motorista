@@ -1,5 +1,6 @@
 import { archetypesPtBR } from './pt-BR.archetypes';
 import { bankerPtBR } from './pt-BR.banker';
+import { campaignPtBR } from './pt-BR.campaign';
 import { careerPtBR } from './pt-BR.career';
 import { environmentPtBR } from './pt-BR.environment';
 import { factionsPtBR } from './pt-BR.factions';
@@ -18,6 +19,7 @@ export const ptBR = {
   ...bankerPtBR,
   ...archetypesPtBR,
   ...careerPtBR,
+  ...campaignPtBR,
   'game.title': 'Supremo Motorista',
   'game.subtitle': 'Transporte Oficial do Tribunal',
 
@@ -110,6 +112,7 @@ export const ptBR = {
   'pause.audio.sfx': 'Efeitos',
   'pause.audio.ambient': 'Ambiente',
   'pause.audio.ui': 'Interface',
+  'pause.audio.music': 'Música',
   'pause.audio.muted': 'Sem som',
   'pause.controls': 'Controles',
   'pause.controls.onFoot': 'A pé',

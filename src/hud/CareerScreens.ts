@@ -13,8 +13,21 @@ export interface WorkshopCar {
   nameKey: StringKey;
 }
 
+/** Cartão genérico (menu principal, capítulo, créditos, final). */
+export interface CardSpec {
+  kicker?: string;
+  title: string;
+  /** HTML (texto já traduzido). */
+  body?: string;
+  footer?: string;
+  buttons: { label: string; act: string; primary?: boolean }[];
+  /** Estilo de capa (menu principal): título grande. */
+  cover?: boolean;
+}
+
 export interface CareerScreenCallbacks {
   onContinue(): void;
+  onCardAct(act: string): void;
   onBuyUpgrade(id: UpgradeId): void;
   onBuyCar(id: string): void;
   onCloseWorkshop(): void;
@@ -24,6 +37,7 @@ export class CareerScreens {
   private readonly badge: HTMLElement;
   private readonly summary: HTMLElement;
   private readonly workshop: HTMLElement;
+  private readonly card: HTMLElement;
   private lastBadge = '';
 
   constructor(
@@ -36,7 +50,13 @@ export class CareerScreens {
     this.summary.hidden = true;
     this.workshop = el('div', 'career-overlay');
     this.workshop.hidden = true;
-    root.append(this.badge, this.summary, this.workshop);
+    this.card = el('div', 'career-overlay');
+    this.card.hidden = true;
+    root.append(this.badge, this.summary, this.workshop, this.card);
+    this.card.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-act]');
+      if (b) cb.onCardAct(b.dataset.act!);
+    });
     this.summary.addEventListener('click', (e) => {
       if ((e.target as HTMLElement).closest('[data-act="continue"]')) cb.onContinue();
     });
@@ -73,10 +93,37 @@ export class CareerScreens {
     return !this.workshop.hidden;
   }
 
-  showSummary(s: ShiftSummary): void {
+  get cardOpen(): boolean {
+    return !this.card.hidden;
+  }
+
+  showCard(c: CardSpec): void {
+    this.card.innerHTML = `
+      <div class="career-panel ${c.cover ? 'cover' : ''}">
+        ${c.kicker ? `<div class="career-kicker">${c.kicker}</div>` : ''}
+        <h2>${c.title}</h2>
+        ${c.body ? `<div class="career-body">${c.body}</div>` : ''}
+        ${c.footer ? `<p class="hud-note">${c.footer}</p>` : ''}
+        ${c.buttons.map((b) => `<button type="button" class="${b.primary ? 'hud-primary' : 'hud-secondary'}" data-act="${b.act}">${b.label}</button>`).join('')}
+      </div>`;
+    this.card.hidden = false;
+    this.card.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
+  }
+
+  hideCard(): void {
+    this.card.hidden = true;
+  }
+
+  /** Primeiro botão do cartão (Enter). */
+  get cardDefaultAct(): string | null {
+    return this.card.querySelector<HTMLButtonElement>('button[data-act]')?.dataset.act ?? null;
+  }
+
+  showSummary(s: ShiftSummary, news?: { paper: string; title: string }): void {
     const row = (label: string, v: number) => `<div class="row"><span>${label}</span><span class="${v < 0 ? 'neg' : 'pos'}">${money(v)}</span></div>`;
     this.summary.innerHTML = `
       <div class="career-panel">
+        ${news ? `<div class="career-news"><div class="career-news-paper">${news.paper}</div><div class="career-news-title">${news.title}</div></div>` : ''}
         <h2>${t('summary.title', { day: s.day })}</h2>
         <p>${t('summary.rides', { n: s.stats.rides, late: s.stats.late })}<br>
           ${t('summary.favors', { n: s.stats.favors })} · ${t('summary.scandals', { n: s.stats.scandals })}</p>

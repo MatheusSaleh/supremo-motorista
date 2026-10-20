@@ -9,6 +9,8 @@ export interface PauseMenuCallbacks {
   onChange: (settings: Settings) => void;
   /** Fase 11: apagar o progresso e começar do dia 1. */
   onNewGame?: () => void;
+  /** Fase 12: salvar e voltar ao menu principal. */
+  onToMenu?: () => void;
 }
 
 const DRAW_DISTANCES: [number, 'pause.draw.short' | 'pause.draw.medium' | 'pause.draw.long' | 'pause.draw.max'][] = [
@@ -100,13 +102,14 @@ export class PauseMenu {
           </div>
         </section>
         <section data-panel="audio" hidden>
-          ${(['master', 'vehicle', 'sfx', 'ambient', 'ui'] as const)
+          ${(['master', 'music', 'vehicle', 'sfx', 'ambient', 'ui'] as const)
             .map((k) => `<label>${t(`pause.audio.${k}`)}<input type="range" min="0" max="100" step="5" data-vol="${k}" /></label>`)
             .join('')}
           <label class="hud-check"><input type="checkbox" data-ref="muted" /> ${t('pause.audio.muted')}</label>
         </section>
         <section data-panel="career" hidden>
           <div data-ref="careerInfo"></div>
+          <button type="button" class="hud-secondary" data-ref="toMenu">${t('menu.toMenu')}</button>
           <button type="button" class="hud-secondary" data-ref="newGame">${t('career.reset')}</button>
         </section>
         <section data-panel="controls" class="hud-controls-grid" hidden>
@@ -129,6 +132,7 @@ export class PauseMenu {
     if (desktop) this.setupDesktop(q);
     this.muted = q('muted');
     this.careerInfo = q('careerInfo');
+    q('toMenu').addEventListener('click', () => this.cb.onToMenu?.());
     q('newGame').addEventListener('click', () => {
       if (window.confirm(t('career.resetConfirm'))) this.cb.onNewGame?.();
     });

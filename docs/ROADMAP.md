@@ -1,5 +1,8 @@
 # Roteiro do desenvolvimento
 
+Todas as fases planejadas estão concluídas. O que vem agora são ajustes de equilíbrio, polimento e as
+pendências da lista no fim deste documento.
+
 O projeto começou como um passeio 3D pela Esplanada dos Ministérios (fases 1–4). Depois da Fase 4 virou o
 **Supremo Motorista**, uma sátira arcade no estilo Crazy Taxi, com as fases 5–12. O multiplayer previsto no
 plano original foi adiado por tempo indeterminado.
@@ -20,7 +23,7 @@ precisa passar.
 | 9 | O banqueiro e o Medidor de Suspeição | ✅ concluída |
 | 10 | Arquétipos de passageiros | ✅ concluída |
 | 11 | Expediente, sessão, melhorias e salvamento | ✅ concluída |
-| 12 | Campanha, finais, menus e áudio | ⏳ próxima |
+| 12 | Campanha, finais, menus e áudio | ✅ concluída |
 
 ---
 
@@ -176,6 +179,26 @@ falas e a conta:
 - **Menu de pausa:** a aba **Carreira** mostra as estatísticas e permite começar um jogo novo.
 - **Debug:** a pasta "Carreira" do painel encerra o expediente, dá dinheiro, libera os carros e salva na hora.
 
+### Fase 12 — Campanha, finais, menus e áudio
+- **Menu principal** sobre o jogo, com a câmera passeando pela Esplanada: Continuar (dia salvo), Novo jogo,
+  Créditos e Sair (desktop). Pelo menu de pausa dá para salvar e voltar a ele.
+- **Campanha de 10 dias:** cada dia começa com um capítulo contado por Dona Neide, chefe da frota fictícia,
+  em sequência — a chegada, a cidade dividida, o Dr. Caixeta se apresentando, a imprensa, a eleição da nova
+  presidência do Tribunal, a verba extra, a proposta irrecusável, a Corregedoria e o dia da posse.
+- **Manchetes da Gazeta da Tesourinha** no contracheque de cada dia, escolhidas pelo que aconteceu:
+  escândalo, favores, perseguições, atrasos, muitas corridas, nenhuma corrida ou dia tranquilo.
+- **Três finais:**
+
+  | Final | Quando |
+  |---|---|
+  | **Demitido** | a qualquer momento, com 3 advertências ou 3 escândalos |
+  | **Sócio do Caixeta** | no fim do dia 10, com 5 ou mais favores aceitos (e mais aceitos que recusados) |
+  | **Motorista Exemplar** | no fim do dia 10, nos outros casos |
+
+  Depois do final dá para seguir em **modo livre** ou começar um jogo novo.
+- **Trilha (CC0):** bossa nova no menu e nos cartões; o rádio do carro toca uma lista de três músicas
+  enquanto Josué dirige. As músicas tocam em streaming e têm volume próprio ("Música") no menu de pausa.
+
 ### Extras feitos entre as fases
 - **Sons (todos CC0):**
   - motor que varia com a rotação e cantada de pneu sintetizada;
@@ -221,10 +244,6 @@ falas e a conta:
 ---
 
 ## O que falta
-
-### Fase 12 — Campanha, finais, menus e áudio ⏳
-- Campanha com **três finais**, decididos pela polarização e pela suspeição.
-- Menu principal, manchetes fictícias entre os expedientes e trilha sonora.
 
 ### Pendências e melhorias conhecidas
 - **Instalador do Windows:** o `.exe` precisa ser gerado no Windows ou com o Wine; hoje sai só o zip.

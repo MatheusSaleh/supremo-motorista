@@ -1,6 +1,7 @@
 // Fase 11: carreira do Josué. Dias de expediente com meta, contracheque, compras na Oficina (melhorias e
 // carros) e o salvamento no localStorage. Sem DOM nem Three.js: o Game aplica os efeitos.
 import { CAR_PRICES, SAVE_KEY, SHIFT, UPGRADES, UPGRADE_EFFECTS as E, dailyGoal, type UpgradeId } from '../data/career';
+import type { EndingId } from '../data/campaign';
 
 export interface DayStats {
   rides: number;
@@ -22,6 +23,9 @@ interface SaveData extends SaveExtras {
   upgrades: Partial<Record<UpgradeId, number>>;
   cars: string[];
   totals: { rides: number; late: number };
+  /** Fase 12 (opcionais: salvamentos antigos não têm). */
+  campaignDone?: boolean;
+  ending?: EndingId | null;
   shift: { started: boolean; timeLeft: number; dayStartMoney: number; overtime: boolean; stats: DayStats };
 }
 
@@ -49,6 +53,9 @@ export class Career {
   readonly upgrades: Partial<Record<UpgradeId, number>> = {};
   readonly cars = new Set<string>();
   totals = { rides: 0, late: 0 };
+  /** Fase 12: a campanha terminou (modo livre) e com qual final. */
+  campaignDone = false;
+  ending: EndingId | null = null;
   // Expediente atual.
   started = false;
   timeLeft = SHIFT.seconds;
@@ -70,12 +77,23 @@ export class Career {
       Object.assign(c.upgrades, d.upgrades);
       for (const id of d.cars) c.cars.add(id);
       c.totals = { ...d.totals };
+      c.campaignDone = d.campaignDone ?? false;
+      c.ending = d.ending ?? null;
       Object.assign(c, { started: d.shift.started, timeLeft: d.shift.timeLeft, overtime: d.shift.overtime, dayStartMoney: d.shift.dayStartMoney });
       c.stats = { ...emptyStats(), ...d.shift.stats };
       c.warned = c.timeLeft <= SHIFT.warnAt;
       return { career: c, extras: { money: d.money, suspicion: d.suspicion } };
     } catch {
       return { career: c, extras: null };
+    }
+  }
+
+  /** Há um jogo salvo? */
+  static exists(): boolean {
+    try {
+      return localStorage.getItem(SAVE_KEY) !== null;
+    } catch {
+      return false;
     }
   }
 
@@ -95,6 +113,8 @@ export class Career {
       upgrades: this.upgrades,
       cars: [...this.cars],
       totals: this.totals,
+      campaignDone: this.campaignDone,
+      ending: this.ending,
       shift: { started: this.started, timeLeft: this.timeLeft, dayStartMoney: this.dayStartMoney, overtime: this.overtime, stats: this.stats },
       ...extras,
     };

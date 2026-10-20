@@ -10,6 +10,8 @@ export interface Volumes {
   sfx: number;
   ambient: number;
   ui: number;
+  /** Fase 12: trilha (menu e rádio do carro). */
+  music: number;
   muted: boolean;
 }
 
@@ -40,7 +42,7 @@ export class AudioSystem {
   private readonly ambientFilter: BiquadFilterNode;
   private readonly duck: GainNode;
   private readonly buffers = new Map<SoundId, AudioBuffer[]>();
-  private volumes: Volumes = { master: 0.8, vehicle: 1, sfx: 1, ambient: 0.8, ui: 0.8, muted: false };
+  private volumes: Volumes = { master: 0.8, vehicle: 1, sfx: 1, ambient: 0.8, ui: 0.8, music: 0.6, muted: false };
   private readonly unlock = () => void this.ctx.resume();
 
   constructor() {
@@ -59,7 +61,7 @@ export class AudioSystem {
       g.connect(dest);
       return g;
     };
-    this.buses = { vehicle: bus(this.duck), sfx: bus(this.duck), ambient: bus(this.ambientFilter), ui: bus(this.master) };
+    this.buses = { vehicle: bus(this.duck), sfx: bus(this.duck), ambient: bus(this.ambientFilter), ui: bus(this.master), music: bus(this.duck) };
     for (const ev of ['pointerdown', 'keydown'] as const) window.addEventListener(ev, this.unlock);
   }
 
@@ -99,6 +101,11 @@ export class AudioSystem {
 
   get currentVolumes(): Volumes {
     return { ...this.volumes };
+  }
+
+  /** Entrada do canal de um bus (para fontes externas, como a música em streaming). */
+  busInput(bus: Bus): AudioNode {
+    return this.buses[bus];
   }
 
   /** Pausa: abaixa tudo menos a interface. */

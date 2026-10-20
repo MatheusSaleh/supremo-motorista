@@ -226,6 +226,19 @@ em [ASSETS.md](ASSETS.md).
 - **Telas no `Game`:** o contracheque e a Oficina são "modais". Com um aberto, a simulação para, o pointer
   lock é solto sem abrir o menu de pausa e o teclado vai para `modalInput()`.
 
+## Campanha, menus e música (`src/data/campaign.ts`, `src/audio/Music.ts`)
+
+- `evaluateEnding()` decide o final no fechamento de cada dia (demissão a qualquer momento; sócio ou
+  exemplar no último dia). `headlineKind()` escolhe a manchete pelos números do dia. O `Career` guarda
+  `campaignDone` e `ending`.
+- Menu principal, capítulos, créditos e finais são "cartões" (`CareerScreens.showCard`): um modal com
+  botões que devolvem uma ação (`Game.cardAct`). Enter aciona o primeiro botão.
+- **Menu principal:** a câmera orbita a Esplanada (`Game.orbitCamera`). "Novo jogo" apaga o salvamento e
+  recarrega a página com uma marca no `sessionStorage`, para abrir direto no capítulo 1.
+- **`Music`:** elemento `<audio>` ligado ao bus `music` do `AudioSystem` (`createMediaElementSource`), com
+  troca suave e lista em sequência. `Game.updateMusic()` escolhe: tema nos cartões, rádio dirigindo,
+  silêncio a pé.
+
 ## Ambiente real (`src/env/`)
 
 | Arquivo | Papel |

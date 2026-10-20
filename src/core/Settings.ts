@@ -42,7 +42,7 @@ export function defaultSettings(): Settings {
     showFps: false,
     minimapRotate: true,
     realWorld: true,
-    audio: { master: 0.8, vehicle: 1, sfx: 1, ambient: 0.8, ui: 0.8, muted: false },
+    audio: { master: 0.8, vehicle: 1, sfx: 1, ambient: 0.8, ui: 0.8, music: 0.6, muted: false },
   };
 }
 

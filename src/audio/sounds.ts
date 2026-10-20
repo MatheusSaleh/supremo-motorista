@@ -1,7 +1,7 @@
 // Manifesto dos sons: id → arquivo(s) em public/audio/, canal e volume base.
 // Vários arquivos = variações sorteadas a cada reprodução. Origem/licença de cada um: CREDITS.md.
 
-export type Bus = 'vehicle' | 'sfx' | 'ambient' | 'ui';
+export type Bus = 'vehicle' | 'sfx' | 'ambient' | 'ui' | 'music';
 
 export interface SoundDef {
   files: string[];
