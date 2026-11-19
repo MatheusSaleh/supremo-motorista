@@ -15,8 +15,7 @@
     "dist:win": "npm run build && electron-builder --win",
     "dist:mac": "npm run build && electron-builder --mac",
     "terrain": "node scripts/fetch-terrain.mjs",
-    "dist:web": "npm run build && node scripts/zip-web.mjs",
-    "sync": "node scripts/sync-repos.mjs"
+    "dist:web": "npm run build && node scripts/zip-web.mjs"
   },
   "devDependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",
