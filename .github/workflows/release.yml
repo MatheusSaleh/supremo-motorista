@@ -24,7 +24,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run dist:win
+      - run: npm run dist:win -- --publish never # só gera os arquivos (sem isso, no CI ele tenta publicar)
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false' # sem certificado de assinatura de código
       - uses: actions/upload-artifact@v4
@@ -46,7 +46,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run dist:linux
+      - run: npm run dist:linux -- --publish never
       - run: node scripts/zip-web.mjs
       - uses: actions/upload-artifact@v4
         with:
