@@ -1,4 +1,4 @@
-// Visual dos carros da frota a partir dos .glb (veículos CC0 de Rgsdev convertidos para public/models/):
+// Visual dos carros da frota (gerados em código por carDesign.ts, ou carregados de um .glb no mesmo formato):
 // rodas animadas pela física, luzes de freio/ré, sujeira e amassados. Frente = +Z; origem = centro do chassi.
 // Também mede o modelo (rodas, lataria) para a física de cada carro (VehicleGeometry).
 import * as THREE from 'three';
@@ -49,7 +49,7 @@ export interface VehicleGeometry {
   interiorScale: THREE.Vector3;
 }
 
-/** Referência: o sedã (Fiord Fusão), para o qual o interior e a física foram ajustados. */
+/** Referência: o sedã executivo original, para o qual o interior e a física foram ajustados. */
 const REF = { width: 2.53, top: 1.8, length: 4.71, bodyHeight: 1.53 };
 
 export const DEFAULT_GEOMETRY: VehicleGeometry = {
@@ -84,7 +84,7 @@ export async function loadCarAsset(assets: Assets, url: string, onProgress?: (f:
 }
 
 /** Mede rodas e lataria do modelo (chão em y = 0, centrado) e deriva o chassi físico. */
-function measure(template: THREE.Object3D): VehicleGeometry {
+export function measure(template: THREE.Object3D): VehicleGeometry {
   template.updateMatrixWorld(true);
   const box = new THREE.Box3();
   const v = new THREE.Vector3();

@@ -14,9 +14,11 @@ export async function loadCharacterAsset(
   assets: Assets,
   cfg: Config,
   onProgress?: (fraction: number) => void,
+  /** Outro modelo com o mesmo esqueleto e os mesmos clips (passageiros); padrão: config.character.url. */
+  url = cfg.character.url,
 ): Promise<CharacterAsset> {
   const c = cfg.character;
-  const gltf = await assets.loadGLTF(c.url, onProgress);
+  const gltf = await assets.loadGLTF(url, onProgress);
   const model = gltf.scene;
 
   model.traverse((o) => {
@@ -48,7 +50,7 @@ export async function loadCharacterAsset(
   template.add(model);
 
   console.info(
-    `[character] ${c.url}: ${size.y.toFixed(2)} → ${targetHeight.toFixed(2)} m; clips: ${gltf.animations.map((a) => a.name).join(', ')}`,
+    `[character] ${url}: ${size.y.toFixed(2)} → ${targetHeight.toFixed(2)} m; clips: ${gltf.animations.map((a) => a.name).join(', ')}`,
   );
   return { template, clips: gltf.animations };
 }

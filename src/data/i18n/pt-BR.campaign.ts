@@ -12,8 +12,8 @@ export const campaignPtBR = {
   'menu.toMenu': 'Salvar e voltar ao menu principal',
   'credits.title': 'Créditos',
   'credits.body':
-    'Criado por Matheus Saleh.<br><br>Carros: modelos do Sketchfab (CC BY): Nieve5677, ItsDiyor, DR1KING100K, Mona x Supercars.<br>' +
-    'Personagem: Jungle Jim (CC BY), animações Mixamo.<br>Sons: autores CC0 do OpenGameArt.<br>' +
+    'Criado por Matheus Saleh.<br><br>Carros: fictícios, gerados no próprio jogo.<br>' +
+    'Personagens: Jungle Jim e Renderpeople (CC BY), animações Mixamo.<br>Sons: autores CC0 do OpenGameArt.<br>' +
     'Música (CC0): KarateStudios, Zane Little Music, Pro Sensory, Spring Spring.<br>' +
     'Clima e relevo: Open-Meteo (CC BY 4.0) e Copernicus DEM. Feriados: BrasilAPI.<br><br>' +
     'Lista completa, com licenças e alterações: CREDITS.md.<br><br>' +
@@ -38,7 +38,7 @@ export const campaignPtBR = {
     'O Tribunal vai escolher a nova presidência daqui a cinco dias. Os ministros estão mais nervosos, mais atrasados e mais faladores. "Hoje vai ter discurso", suspira Dona Neide.',
   'chapter.6.title': 'Verba extra',
   'chapter.6.body':
-    'Saiu uma verba extra para "modernização da frota". "Use bem a Oficina", diz Dona Neide. "E se for comprar o Lexo, pelo amor de Deus, não chama de licitação."',
+    'Saiu uma verba extra para "modernização da frota". "Use bem a Oficina", diz Dona Neide. "E se for comprar o Solene, pelo amor de Deus, não chama de licitação."',
   'chapter.7.title': 'Proposta irrecusável',
   'chapter.7.body':
     'O Dr. Caixeta liga de novo: "Josué, você é um talento desperdiçado. O Banco Confiança tem vaga de consultor. Basta continuar sendo… prestativo." Dona Neide finge que não ouviu.',

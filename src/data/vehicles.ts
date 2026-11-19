@@ -1,10 +1,12 @@
-// Frota oficial do Tribunal: os modelos usados por autoridades em Brasília. Os modelos 3D são fiéis
-// (Sketchfab, CC-BY — ver CREDITS.md); os NOMES no jogo são paródias, sem marcas reais. Textos no i18n.
+// Frota oficial do Tribunal: carros FICTÍCIOS (montadoras e modelos inventados), gerados em código por
+// src/vehicle/carDesign.ts. Cada um lembra uma categoria comum nas frotas oficiais (SUV grande, sedã compacto,
+// sedã executivo, SUV média, sedã de luxo), sem copiar o desenho de nenhum carro real. Textos no i18n.
 //
 // `physics` sobrescreve só o que muda em relação a config.car (o resto continua vindo de lá, inclusive
 // os ajustes feitos ao vivo no lil-gui).
 import type { Config } from '../config';
 import type { StringKey } from '../core/i18n';
+import type { CarDesign } from '../vehicle/carDesign';
 
 type CarParams = Config['car'];
 
@@ -13,9 +15,9 @@ export interface VehicleDef {
   nameKey: StringKey;
   /** Frase ao entrar no carro (e na placa da vaga). */
   taglineKey: StringKey;
-  /** Modelo detalhado (Alta/Ultra) e leve (Baixa/Média). */
-  model: { hq: string; lq: string };
-  /** Cor da pintura; null mantém a do modelo (pintura em textura). */
+  /** Desenho do carro (carroceria, rodas, faróis…). */
+  design: CarDesign;
+  /** Cor da pintura; null mantém a do desenho. */
   paint: number | null;
   /** O modelo já tem interior próprio (o procedural fica escondido; motorista e volante continuam). */
   modelInterior: boolean;
@@ -33,7 +35,14 @@ export const FLEET: VehicleDef[] = [
     id: 'sw4',
     nameKey: 'vehicle.sw4.name',
     taglineKey: 'vehicle.sw4.tagline',
-    model: { hq: 'models/fleet/sw4.glb', lq: 'models/fleet/sw4.glb' },
+    design: {
+      // SUV grande de chassi, alta e quadrada, com três janelas laterais e barras no teto.
+      length: 4.8, width: 1.86, height: 1.8, axles: [1.41, -1.32], track: 0.77, wheelRadius: 0.37, tireWidth: 0.26,
+      sill: 0.42, belt: 1.22, hood: 1.12, deck: 1.2, noseRound: 0.3, tailRound: 0.2,
+      glass: { base: 1.1, roofFront: 0.44, roofRear: -2.0, rear: -2.2, roofHalf: 0.72 },
+      bPillar: -0.22, midPillar: -1.2, cPillar: -1.98, clad: 0.12,
+      style: { grille: 'bars', tail: 'corners', headlight: { height: 0.13, inner: 0.42, wrap: 0.16 }, rails: true, rim: { spokes: 6, color: 0x55595f } },
+    },
     paint: 0x0d0f12,
     modelInterior: false,
     // 4x4 diesel: pesada, menos ágil e mais alta (tomba mais fácil), mas não liga para gramado.
@@ -55,7 +64,14 @@ export const FLEET: VehicleDef[] = [
     id: 'corolinha',
     nameKey: 'vehicle.corolinha.name',
     taglineKey: 'vehicle.corolinha.tagline',
-    model: { hq: 'models/fleet/corolla.glb', lq: 'models/fleet/corolla-lod.glb' },
+    design: {
+      // Sedã compacto de três volumes, linhas suaves.
+      length: 4.63, width: 1.78, height: 1.44, axles: [1.38, -1.3], track: 0.76, wheelRadius: 0.318, tireWidth: 0.215,
+      sill: 0.22, belt: 0.93, hood: 0.74, deck: 0.9, noseRound: 0.5, tailRound: 0.32,
+      glass: { base: 1.0, roofFront: 0.36, roofRear: -0.9, rear: -1.55, roofHalf: 0.63 },
+      bPillar: -0.16, cPillar: -1.02, clad: 0.04,
+      style: { grille: 'wide', tail: 'corners', headlight: { height: 0.09, inner: 0.36, wrap: 0.2 }, rim: { spokes: 10, color: 0xb9bdc3 } },
+    },
     paint: 0xaeb3b9,
     modelInterior: false,
     // Leve e esperto, motor fraco; turbo recarrega rápido ("econômico").
@@ -73,7 +89,14 @@ export const FLEET: VehicleDef[] = [
     id: 'fusao',
     nameKey: 'vehicle.fusao.name',
     taglineKey: 'vehicle.fusao.tagline',
-    model: { hq: 'models/fleet/fusion.glb', lq: 'models/fleet/fusion-lod.glb' },
+    design: {
+      // Sedã executivo médio, o "carro de ministro" clássico: capô longo, teto em arco.
+      length: 4.87, width: 1.85, height: 1.46, axles: [1.47, -1.35], track: 0.78, wheelRadius: 0.338, tireWidth: 0.235,
+      sill: 0.24, belt: 0.96, hood: 0.78, deck: 0.92, noseRound: 0.45, tailRound: 0.34,
+      glass: { base: 1.06, roofFront: 0.4, roofRear: -0.95, rear: -1.62, roofHalf: 0.66 },
+      bPillar: -0.18, cPillar: -1.08, clad: 0.05,
+      style: { grille: 'slot', tail: 'corners', headlight: { height: 0.08, inner: 0.4, wrap: 0.22 }, chrome: true, rim: { spokes: 5, color: 0xc4c8ce, twin: true } },
+    },
     paint: 0x0e1013,
     modelInterior: false,
     physics: {}, // referência: os valores de config.car
@@ -84,8 +107,15 @@ export const FLEET: VehicleDef[] = [
     id: 'equinocio',
     nameKey: 'vehicle.equinocio.name',
     taglineKey: 'vehicle.equinocio.tagline',
-    model: { hq: 'models/fleet/equinox.glb', lq: 'models/fleet/equinox-lod.glb' },
-    paint: 0x111316,
+    design: {
+      // SUV média urbana: teto preto, vidro traseiro inclinado, plásticos nas caixas de roda.
+      length: 4.64, width: 1.84, height: 1.68, axles: [1.36, -1.34], track: 0.74, wheelRadius: 0.375, tireWidth: 0.24,
+      sill: 0.36, belt: 1.1, hood: 1.0, deck: 1.07, noseRound: 0.36, tailRound: 0.24,
+      glass: { base: 1.06, roofFront: 0.38, roofRear: -1.78, rear: -2.08, roofHalf: 0.68 },
+      bPillar: -0.2, cPillar: -1.68, clad: 0.12,
+      style: { grille: 'wide', tail: 'corners', headlight: { height: 0.07, inner: 0.38, wrap: 0.24 }, blackRoof: true, rim: { spokes: 5, color: 0x3a3d42, twin: true } },
+    },
+    paint: 0xe6e6e1, // branco com teto preto ("Branco, para combinar com as minhas decisões")
     modelInterior: false,
     // SUV média: meio-termo em tudo.
     physics: {
@@ -104,7 +134,14 @@ export const FLEET: VehicleDef[] = [
     id: 'lexo',
     nameKey: 'vehicle.lexo.name',
     taglineKey: 'vehicle.lexo.tagline',
-    model: { hq: 'models/fleet/lexus.glb', lq: 'models/fleet/lexus-lod.glb' },
+    design: {
+      // Sedã de luxo híbrido, longo e baixo: grade alta cromada, lanterna de ponta a ponta, frisos cromados.
+      length: 4.97, width: 1.86, height: 1.45, axles: [1.47, -1.38], track: 0.81, wheelRadius: 0.358, tireWidth: 0.24,
+      sill: 0.23, belt: 0.96, hood: 0.8, deck: 0.94, noseRound: 0.42, tailRound: 0.3,
+      glass: { base: 1.12, roofFront: 0.42, roofRear: -1.0, rear: -1.72, roofHalf: 0.66 },
+      bPillar: -0.2, cPillar: -1.12, clad: 0.04,
+      style: { grille: 'tall', tail: 'bar', headlight: { height: 0.07, inner: 0.44, wrap: 0.26 }, chrome: true, rim: { spokes: 12, color: 0xd2d5da } },
+    },
     paint: 0x2b2f36,
     modelInterior: false,
     // Sedã de luxo híbrido: macio, rápido na reta, "turbo elétrico" que recarrega sozinho, derrapa mal

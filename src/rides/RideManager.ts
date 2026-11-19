@@ -131,8 +131,10 @@ export class RideManager {
 
   private readonly beacon: Beacon;
   private readonly arrow = new DirectionArrow();
-  private readonly npc: PassengerNpc | null;
-  private readonly rearPassenger: SeatedDriver | null;
+  /** Um passageiro (na calçada e sentado) por modelo de personagem; `who` = o da corrida atual. */
+  private readonly npcs: PassengerNpc[];
+  private readonly seated: SeatedDriver[];
+  private who = 0;
   private vehicle: Car | null = null;
   private conditions: RideConditions = { holiday: false, holidayEve: false, rain: false, dry: false, night: false };
   /** A próxima oferta pode ser um favor (decidido pelo Game, que conhece a suspeição). */
@@ -149,24 +151,33 @@ export class RideManager {
     private readonly level: Level,
     scene: THREE.Scene,
     rearSeat: THREE.Object3D,
-    character: CharacterAsset | null,
+    /** Modelos de passageiro; o primeiro é o executivo (o único que veste o Dr. Caixeta). */
+    characters: CharacterAsset[],
     cfg: Config,
     private readonly hooks: RideHooks,
   ) {
     this.beacon = new Beacon(COLORS.pickup, T.pickupRadius);
     scene.add(this.beacon.root, this.arrow.root);
-    this.npc = character ? new PassengerNpc(character, 'Wave') : null;
-    if (this.npc) scene.add(this.npc.root);
-    this.rearPassenger = character ? new SeatedDriver(character, cfg) : null;
-    if (this.rearPassenger) rearSeat.add(this.rearPassenger.root);
+    this.npcs = characters.map((c) => new PassengerNpc(c, 'Wave'));
+    for (const n of this.npcs) scene.add(n.root);
+    this.seated = characters.map((c) => new SeatedDriver(c, cfg));
+    for (const p of this.seated) rearSeat.add(p.root);
     rearSeat.add(this.maleta.seated);
     scene.add(this.maleta.ground);
+  }
+
+  private get npc(): PassengerNpc | null {
+    return this.npcs[this.who] ?? null;
+  }
+
+  private get rearPassenger(): SeatedDriver | null {
+    return this.seated[this.who] ?? null;
   }
 
   /** Carro atual (frota): o passageiro a bordo muda junto; gorjeta e falas dependem do modelo. */
   setVehicle(car: Car): void {
     this.vehicle = car;
-    if (this.rearPassenger) car.model.rearSeat.add(this.rearPassenger.root);
+    for (const p of this.seated) car.model.rearSeat.add(p.root);
     car.model.rearSeat.add(this.maleta.seated);
   }
 
@@ -259,6 +270,10 @@ export class RideManager {
     this.beacon.place(from.x, this.groundAt(from), from.z, COLORS.pickup);
     // Passageiro de frente para o centro do mapa (≈ lado da rua na maioria dos endereços).
     const banker = this.ride.passenger.id === CAIXETA.passengerId;
+    // Rosto do passageiro: o Dr. Caixeta é sempre o executivo (terno creme); os outros, sorteados.
+    for (const n of this.npcs) n.hide();
+    for (const p of this.seated) p.visible = false;
+    this.who = banker ? 0 : Math.floor(Math.random() * this.npcs.length);
     const look = banker ? CAIXETA.look : PASSENGER_LOOKS[Math.floor(Math.random() * PASSENGER_LOOKS.length)];
     this.npc?.setLook(look);
     this.rearPassenger?.setLook(look);
@@ -400,8 +415,8 @@ export class RideManager {
   dispose(): void {
     this.beacon.dispose();
     this.arrow.dispose();
-    this.npc?.dispose();
-    this.rearPassenger?.dispose();
+    for (const n of this.npcs) n.dispose();
+    for (const p of this.seated) p.dispose();
   }
 
   // -------------------------------------------------------------------------
@@ -545,7 +560,7 @@ export class RideManager {
     this.hooks.sound('doorClose');
     this.hurried = false;
     this.idleTimer = 14 + Math.random() * 10;
-    // Metade das vezes o passageiro comenta o carro (Lexo: a licitação).
+    // Metade das vezes o passageiro comenta o carro (o de luxo: a licitação).
     const def = this.vehicle?.def;
     const env = this.environmentLine();
     if (this.ride!.template.favor) this.say('board', true);

@@ -75,7 +75,7 @@
           download('personagem.glb', r.glb);
           images(r.shots, 'pose');
         });
-      fetch('./exemplos/fusion.json')
+      fetch('./exemplos/personagem.json')
         .then((r) => r.text())
         .then((t) => ($('cfg').value = t));
     </script>

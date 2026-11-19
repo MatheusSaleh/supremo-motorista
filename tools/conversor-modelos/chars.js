@@ -5,7 +5,24 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 
 const FPS = 30;
-const mixName = (n) => 'mixamorig' + n.replace(/^mixamorig:?/, '').replace(/_\d+$/, '');
+// Nomes de ossos de outros padrões → Mixamo. Chave: nome sem o sufixo numérico que o Sketchfab acrescenta.
+const BONE_ALIASES = {
+  // Renderpeople / estilo Unreal (ex.: "Eric Rigged").
+  hip: 'Hips', spine_01: 'Spine', spine_02: 'Spine1', spine_03: 'Spine2', neck: 'Neck', head: 'Head',
+  shoulder_l: 'LeftShoulder', upperarm_l: 'LeftArm', lowerarm_l: 'LeftForeArm', hand_l: 'LeftHand',
+  shoulder_r: 'RightShoulder', upperarm_r: 'RightArm', lowerarm_r: 'RightForeArm', hand_r: 'RightHand',
+  upperleg_l: 'LeftUpLeg', lowerleg_l: 'LeftLeg', foot_l: 'LeftFoot', ball_l: 'LeftToeBase',
+  upperleg_r: 'RightUpLeg', lowerleg_r: 'RightLeg', foot_r: 'RightFoot', ball_r: 'RightToeBase',
+  // Coluna em ordem invertida (Spine02 logo acima do quadril) e pescoço minúsculo.
+  Spine02: 'Spine', Spine01: 'Spine1', neck_: 'Neck',
+};
+let invertedSpine = false;
+const mixName = (n) => {
+  const base = n.replace(/^mixamorig:?/, '').replace(/_\d+$/, '');
+  if (invertedSpine && base === 'Spine') return 'mixamorigSpine2';
+  if (base === 'neck') return 'mixamorigNeck';
+  return 'mixamorig' + (BONE_ALIASES[base] ?? base);
+};
 
 function bonesOf(root) {
   const map = new Map();
@@ -38,6 +55,13 @@ function retarget(target, source, clip, name, keepHipsY = true) {
   const hs0 = wp(hipsS);
   const ht0 = wp(hipsT);
   const ratio = ht0.y / hs0.y;
+  // Poses de descanso diferentes (ex.: alvo em pose A, Xbot em pose T): em vez de copiar a rotação relativa
+  // (que somaria a diferença), cada osso aponta para onde o osso equivalente do Xbot aponta.
+  const armDir = (bones) => wp(bones.get('mixamorigLeftForeArm')).sub(wp(bones.get('mixamorigLeftArm'))).normalize();
+  const aim = tB.has('mixamorigLeftForeArm') && armDir(tB).angleTo(armDir(sB)) > 0.35;
+  const aimChild = new Map(
+    tList.map((b) => [b.name, b.name === 'mixamorigHips' ? null : (b.children.find((c) => c.isBone && sB.has(c.name)) ?? null)]),
+  );
 
   const mixer = new THREE.AnimationMixer(source);
   const action = mixer.clipAction(clip);
@@ -60,8 +84,17 @@ function retarget(target, source, clip, name, keepHipsY = true) {
     }
     target.updateMatrixWorld(true);
     for (const b of tList) {
-      const Ws = wq(sB.get(b.name));
-      const want = Ws.multiply(tmp.copy(Ws0.get(b.name)).invert()).multiply(Wt0.get(b.name));
+      const child = aim ? aimChild.get(b.name) : null;
+      let want;
+      if (child) {
+        const sb = sB.get(b.name);
+        const srcDir = wp(sB.get(child.name)).sub(wp(sb)).normalize();
+        const cur = wp(child).sub(wp(b)).normalize();
+        want = new THREE.Quaternion().setFromUnitVectors(cur, srcDir).multiply(wq(b));
+      } else {
+        const Ws = wq(sB.get(b.name));
+        want = Ws.multiply(tmp.copy(Ws0.get(b.name)).invert()).multiply(Wt0.get(b.name));
+      }
       const parentW = b.parent ? wq(b.parent) : new THREE.Quaternion();
       b.quaternion.copy(parentW.invert().multiply(want));
       b.updateMatrixWorld(true);
@@ -84,7 +117,9 @@ function retarget(target, source, clip, name, keepHipsY = true) {
   }
   const tracks = tList.map((b) => new THREE.QuaternionKeyframeTrack(`${b.name}.quaternion`, times, qs.get(b.name)));
   tracks.push(new THREE.VectorKeyframeTrack('mixamorigHips.position', times, hp));
-  return new THREE.AnimationClip(name, clip.duration, tracks);
+  const out = new THREE.AnimationClip(name, clip.duration, tracks);
+  out.userData = { aim };
+  return out;
 }
 
 /**
@@ -163,9 +198,15 @@ window.buildCharacter = async (cfg) => {
   const model = await loader.loadAsync(cfg.model);
   const xbot = await loader.loadAsync(cfg.anim);
   const root = model.scene;
+  // Esqueleto com "Spine02" (coluna invertida): o "Spine" dele é o de cima.
+  invertedSpine = false;
+  root.traverse((o) => {
+    if (o.isBone && /^Spine02(_\d+)?$/.test(o.name)) invertedSpine = true;
+  });
   root.traverse((o) => {
     if (o.isBone) o.name = mixName(o.name);
   });
+  invertedSpine = false;
   xbot.scene.traverse((o) => {
     if (o.isBone) o.name = mixName(o.name);
   });
@@ -177,7 +218,15 @@ window.buildCharacter = async (cfg) => {
     log.push(`removida (sem skin): ${o.name} ${o.material.name}`);
     o.removeFromParent();
   }
+  // Modelos em centímetros (ou outra unidade): normaliza para ~1,8 m antes de montar poses em metros.
   root.updateMatrixWorld(true);
+  const height = new THREE.Box3().setFromObject(root).getSize(new THREE.Vector3()).y;
+  if (height > 3 || height < 0.9) {
+    const k = 1.8 / height;
+    root.scale.multiplyScalar(k);
+    root.updateMatrixWorld(true);
+    log.push(`escala ×${k.toFixed(4)} (altura ${height.toFixed(2)})`);
+  }
   const B = bonesOf(root);
   const lh = wp(B.get('mixamorigLeftHand'));
   const head = wp(B.get('mixamorigHead'));
@@ -190,6 +239,7 @@ window.buildCharacter = async (cfg) => {
     retarget(root, xbot.scene, src('walk'), 'Walking'),
     retarget(root, xbot.scene, src('run'), 'Running'),
   ];
+  log.push(`retarget: ${clips[0].userData?.aim ? 'por direção' : 'por rotação'}`);
   log.push(`velocidades: andar ${clipSpeed(root, clips[1]).toFixed(2)} correr ${clipSpeed(root, clips[2]).toFixed(2)} m/s`);
 
   const hipsRestY = wp(B.get('mixamorigHips')).y;

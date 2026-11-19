@@ -34,7 +34,10 @@
   "main": "electron/main.cjs",
   "productName": "Supremo Motorista",
   "description": "Supremo Motorista — sátira arcade em Brasília",
-  "author": "Matheus Saleh",
+  "author": {
+    "name": "Matheus Saleh",
+    "email": "100796455+MatheusSaleh@users.noreply.github.com"
+  },
   "build": {
     "appId": "br.supremomotorista.jogo",
     "productName": "Supremo Motorista",
@@ -67,7 +70,12 @@
       ],
       "category": "Game",
       "syncDesktopName": true,
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "maintainer": "Matheus Saleh <100796455+MatheusSaleh@users.noreply.github.com>"
+    },
+    "deb": {
+      "packageName": "supremo-motorista",
+      "artifactName": "supremo-motorista_${version}_${arch}.${ext}"
     },
     "mac": {
       "target": [
@@ -79,5 +87,6 @@
     "executableName": "supremo-motorista"
   },
   "desktopName": "supremo-motorista.desktop",
-  "license": "SEE LICENSE IN LICENSE"
+  "license": "SEE LICENSE IN LICENSE",
+  "homepage": "https://github.com/MatheusSaleh/supremo-motorista"
 }

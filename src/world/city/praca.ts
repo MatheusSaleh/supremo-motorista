@@ -99,6 +99,15 @@ function buildGarage(b: CityBuilder, g: THREE.Object3D): void {
     const l = b.box(g, w - 4, 0.08, 0.5, lamp, x, h - 0.06, z + lz);
     l.userData.noCollision = true;
     l.castShadow = false;
+    // Luz real só na luminária do meio (uma luz pontual cobre a garagem; mais seria caro na cena toda).
+    // Filha da luminária para subir junto com o relevo; o env/Atmosphere acende à noite (userData.nightLight).
+    if (lz === 0) {
+      l.userData.noBatch = true; // malha agrupada fica invisível, e luz filha de objeto invisível não acende
+      const light = new THREE.PointLight(0xfff1d6, 0, 34, 1.4);
+      light.position.set(0, -0.6, 0);
+      light.userData.nightLight = 90;
+      l.add(light);
+    }
   }
   // Pista de acesso até a pista do Eixo.
   b.road(g, 'local', ROAD_OUTER, z, x - w / 2, z, 'none');

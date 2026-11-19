@@ -8,23 +8,19 @@ Registro de origem e licença de todo asset de terceiros usado no jogo.
 | --- | --- | --- | --- |
 | `public/models/characters/executivo.glb` (malha e texturas) | Jungle Jim — https://sketchfab.com/jungle_jim | CC BY 4.0 | "Businessman (Rigged)": https://sketchfab.com/3d-models/businessman-rigged-8933d61fcb1e46f3aead661227bb4fed |
 | `public/models/characters/executivo.glb` (animações parado/andar/correr) | Mixamo (Adobe), via `Xbot.glb` do repositório do three.js | Termos do Mixamo (uso livre em projetos) | https://github.com/mrdoob/three.js/tree/r170/examples/models/gltf |
-| `public/models/fleet/sw4.glb` | Nieve5677 — https://sketchfab.com/niev | CC BY 4.0 | "Toyota SW4 Fortuner": https://sketchfab.com/3d-models/toyota-sw4-fortuner-379e4180f137480b9a8578e7da9184e2 |
-| `public/models/fleet/corolla*.glb` | ItsDiyor — https://sketchfab.com/ItsDiyor | CC BY 4.0 | "Toyota Corolla 2020": https://sketchfab.com/3d-models/toyota-corolla-2020-6d7d34ee42734d1ab28a6b1f1c5fc4fc |
-| `public/models/fleet/fusion*.glb` | DR1KING100K — https://sketchfab.com/DR1KING100K | CC BY 4.0 | "Ford Fusion 2017": https://sketchfab.com/3d-models/ford-fusion-2017-5ca339f3322a4d03b7e216d947dcbf8f |
-| `public/models/fleet/equinox*.glb` | ItsDiyor — https://sketchfab.com/ItsDiyor | CC BY 4.0 | "Chevrolet Equinox RS": https://sketchfab.com/3d-models/chevrolet-equinox-rs-5ce0949b13264256a96c912e393a41de |
-| `public/models/fleet/lexus*.glb` | Mona x Supercars — https://sketchfab.com/Car2022 | CC BY 4.0 | "Lexus ES Hybrid": https://sketchfab.com/3d-models/lexus-es-hybrid-b4edfa2fd5cc48ada679352215e0105e |
+| `public/models/characters/passageiro-eric.glb` (malha e texturas) | Renderpeople — https://sketchfab.com/renderpeople | CC BY 4.0 | "Eric Rigged 001 - Rigged 3D Business Man": https://sketchfab.com/3d-models/eric-rigged-001-rigged-3d-business-man-a46bc9f67aaa415bb4f3241eef900e7f |
+| `public/models/characters/passageiro-eric.glb` (animações) | Mixamo (Adobe), via `Xbot.glb` do repositório do three.js | Termos do Mixamo (uso livre em projetos) | https://github.com/mrdoob/three.js/tree/r170/examples/models/gltf |
 
-**Alterações feitas nos modelos da frota (exigência da CC BY):** convertidos para escala real em metros e
-orientação do jogo; rodas separadas da carroceria; interior removido no SW4, no Fusion, no Equinox e no Lexus; malhas
-simplificadas (versões `*-lod.glb` mais leves); texturas reduzidas; pintura recolorida (SW4, Corolla, Fusion,
-Equinox, Lexus); materiais coloridos no Fusion (o original não tem cores); no Equinox a suspensão, o chassi e a placa com
-a assinatura do autor foram removidos.
+Os carros da frota não usam modelos de terceiros: são fictícios e gerados em código
+(`src/vehicle/carDesign.ts`).
 
 **Alterações no executivo (exigência da CC BY):** ossos renomeados para o padrão Mixamo; dentes/língua
 (sem skinning) removidos; animações do Xbot redirecionadas para o esqueleto dele; poses de sentar, acenar e
-pular criadas para o jogo; texturas reduzidas. Os passageiros usam o mesmo modelo com terno e pele recoloridos.
-No jogo os carros aparecem com nomes paródia ("Toiota SW-Quatro" etc.); as marcas pertencem aos seus donos e
-não endossam este projeto.
+pular criadas para o jogo; texturas reduzidas. Os passageiros sorteiam a cor do terno e o tom de pele.
+
+**Alterações no passageiro "Eric" (exigência da CC BY):** ossos renomeados do padrão Renderpeople para o
+Mixamo; animações do Xbot redirecionadas para o esqueleto dele (com ajuste da pose A para a pose T); poses de
+sentar, acenar e pular criadas para o jogo; texturas reduzidas.
 
 ## Sons (`public/audio/`)
 

@@ -49,8 +49,9 @@ export function createCarInterior(): CarInterior {
   // Assoalho, forros das portas (com apoio de braço e maçaneta), painel corta-fogo.
   box(carpet, 1.96, 0.05, 2.25, 0, FLOOR, -0.15);
   for (const s of [-1, 1]) {
-    box(leatherDark, 0.04, 0.62, 1.85, s * 0.96, 0.76, -0.3);
-    box(plastic, 0.1, 0.05, 1.5, s * 0.91, 0.82, -0.3); // apoio de braço
+    // Até a frente da caixa de roda traseira (mais para trás o forro atravessaria o para-lama).
+    box(leatherDark, 0.04, 0.62, 1.5, s * 0.96, 0.76, -0.13);
+    box(plastic, 0.1, 0.05, 1.3, s * 0.91, 0.82, -0.18); // apoio de braço
     box(chrome, 0.03, 0.03, 0.14, s * 0.93, 0.95, 0.35); // maçaneta interna
   }
 
@@ -83,7 +84,7 @@ export function createCarInterior(): CarInterior {
     add(chrome, new THREE.CylinderGeometry(0.008, 0.008, 0.1, 5).translate(s * DRIVER_X - 0.07, FLOOR + 0.87, -0.32));
     add(chrome, new THREE.CylinderGeometry(0.008, 0.008, 0.1, 5).translate(s * DRIVER_X + 0.07, FLOOR + 0.87, -0.32));
   }
-  seat(0, -0.82, 1.72);
+  seat(0, -0.82, 1.5); // entre as caixas de roda
   for (const hx of [-0.55, 0, 0.55]) box(leather, 0.24, 0.16, 0.09, hx, FLOOR + 0.92, -1.04, -0.15);
   box(carpet, 1.9, 0.03, 0.3, 0, 1.05, -1.33); // tampa do porta-malas (bagagito)
 

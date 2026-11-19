@@ -28,6 +28,8 @@ export const config = {
   character: {
     // Caminho relativo a public/. Executivo de terno (esqueleto Mixamo; clips montados na conversão).
     url: 'models/characters/executivo.glb',
+    /** Fase 12+: modelos extras de passageiro (mesmo esqueleto Mixamo e clips), para variar os rostos. */
+    passengerUrls: ['models/characters/passageiro-eric.glb'] as string[],
     // Nome (ou parte do nome, sem diferenciar maiúsculas) de cada animação no .glb. '' = não existe.
     clips: { idle: 'Idle', walk: 'Walking', run: 'Running', jump: 'Jump', fall: '' },
     /** Rotação extra caso o modelo não olhe para +Z (ex.: Math.PI). */

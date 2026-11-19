@@ -61,6 +61,8 @@ export class Atmosphere {
   private readonly lamps: THREE.MeshStandardMaterial[] = [];
   private readonly windows: THREE.MeshStandardMaterial[] = [];
   private readonly roads: { mat: THREE.MeshStandardMaterial; color: THREE.Color; roughness: number }[] = [];
+  /** Luzes reais do cenário que acendem à noite (ex.: garagem), com a intensidade máxima. */
+  private readonly nightLights: { light: THREE.Light; max: number }[] = [];
   private carLights: THREE.MeshStandardMaterial[] = [];
   private readonly dir = new THREE.Vector3();
   private readonly tmpA = new THREE.Color();
@@ -77,6 +79,9 @@ export class Atmosphere {
       if (m.userData.nightGlow) this.windows.push(m);
       if (m.userData.wetRoad) this.roads.push({ mat: m, color: m.color.clone(), roughness: m.roughness });
     }
+    world.level?.root.traverse((o) => {
+      if (o instanceof THREE.Light && typeof o.userData.nightLight === 'number') this.nightLights.push({ light: o, max: o.userData.nightLight });
+    });
     // Farol do carro atual: um SpotLight só, preso à frente do carro (ver attachCar).
     this.headlight.castShadow = false;
     this.headlight.name = 'farol';
@@ -140,6 +145,7 @@ export class Atmosphere {
     const lightsOn = Math.max(n, 0.45 * this.rainAmt * this.cloud, 0.6 * this.fog);
     for (const m of this.lamps) m.emissiveIntensity = (m.userData.lampGlow as number) * lightsOn;
     for (const m of this.windows) m.emissiveIntensity = (m.userData.nightGlow as number) * n;
+    for (const { light, max } of this.nightLights) light.intensity = max * lightsOn;
     this.headlight.intensity = driving ? 900 * lightsOn : 0; // estacionado: farol apagado
     for (const m of this.carLights) {
       if (m.emissive.getHex() === 0) m.emissive.setHex(0xfff2d6);
@@ -172,6 +178,7 @@ export class Atmosphere {
     this.world.setLighting(L);
     this.world.setSunDirection(this.dir.set(0.3, 1, 0.2));
     for (const m of [...this.lamps, ...this.windows]) m.emissiveIntensity = 0;
+    for (const { light } of this.nightLights) light.intensity = 0;
     for (const r of this.roads) {
       r.mat.color.copy(r.color);
       r.mat.roughness = r.roughness;

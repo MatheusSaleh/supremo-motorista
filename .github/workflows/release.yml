@@ -1,0 +1,58 @@
+# Gera as versões para distribuição em máquinas do GitHub (o instalador .exe do Windows precisa de Windows
+# ou Wine, que a máquina de desenvolvimento não tem). Roda só quando pedido (aba Actions → "Gerar versões"
+# → Run workflow) ou ao criar uma tag v*, para não gastar minutos de Actions a cada push.
+# Os arquivos ficam como "artifacts" da execução (Actions → a execução → Artifacts), por 14 dias.
+name: Gerar versões
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows (instalador, portátil e zip)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run dist:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false' # sem certificado de assinatura de código
+      - uses: actions/upload-artifact@v4
+        with:
+          name: supremo-motorista-windows
+          path: |
+            release/*.exe
+            release/*.zip
+          retention-days: 14
+
+  linux:
+    name: Linux (AppImage e .deb) e web (itch.io)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run dist:linux
+      - run: node scripts/zip-web.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: supremo-motorista-linux-web
+          path: |
+            release/*.AppImage
+            release/*.deb
+            release/*-web.zip
+          retention-days: 14

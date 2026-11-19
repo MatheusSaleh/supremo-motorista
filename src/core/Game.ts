@@ -17,7 +17,8 @@ import { Player, type MoveIntent } from '../player/Player';
 import { RideManager } from '../rides/RideManager';
 import { Car, type CarControls, type CarEvent } from '../vehicle/Car';
 import { CarEffects } from '../vehicle/CarEffects';
-import { loadCarAsset, type CarAsset } from '../vehicle/CarVisual';
+import type { CarAsset } from '../vehicle/CarVisual';
+import { buildCarAsset } from '../vehicle/carDesign';
 import { DEFAULT_VEHICLE, FLEET, type VehicleDef } from '../data/vehicles';
 import { Atmosphere } from '../env/Atmosphere';
 import { Environment, type EnvSnapshot } from '../env/Environment';
@@ -156,7 +157,7 @@ export class Game {
 
     progress.set('physics', 0, t('loading.physics'));
     const lowQuality = ['baixa', 'media'].includes(loadSettings().quality);
-    const [, character, level, , carAssets, pursuerAssets] = await Promise.all([
+    const [, character, level, , carAssets, pursuerAssets, passengerAssets] = await Promise.all([
       RAPIER.init().then(() => progress.set('physics', 1)),
       loadCharacterAsset(assets, cfg, (f) => progress.set('character', f, t('loading.character')))
         .catch((err: unknown) => {
@@ -169,31 +170,21 @@ export class Game {
         return l;
       }),
       audio.load((f) => progress.set('audio', f, t('loading.audio'))),
-      // Frota: um .glb por carro (em paralelo). Falha num modelo → aquele carro usa o sedã procedural.
-      (async () => {
-        let done = 0;
-        const list = await Promise.all(
-          FLEET.map((def) =>
-            // Qualidade Baixa/Média: modelos leves.
-            loadCarAsset(assets, lowQuality ? def.model.lq : def.model.hq)
-              .catch((err: unknown) => {
-                console.warn(`[game] falha ao carregar o modelo de ${def.id}; usando o sedã procedural.`, err);
-                return null;
-              })
-              .finally(() => progress.set('vehicle', ++done / FLEET.length, t('loading.vehicle'))),
-          ),
-        );
-        return new Map(FLEET.map((def, i) => [def.id, list[i]] as const));
-      })(),
-      // Perseguidores: sempre os modelos leves da frota (na qualidade Baixa/Média, os mesmos já carregados).
-      lowQuality
-        ? Promise.resolve(null)
-        : Promise.all(
-            PURSUER_MODELS.map((id) => {
-              const def = FLEET.find((d) => d.id === id);
-              return def ? loadCarAsset(assets, def.model.lq).catch(() => null) : Promise.resolve(null);
-            }),
-          ),
+      // Frota: carros fictícios gerados em código (rápido; Baixa/Média usam a versão com menos polígonos).
+      Promise.resolve().then(() => {
+        const map = new Map(FLEET.map((def) => [def.id, buildCarAsset(def.design, lowQuality)] as const));
+        progress.set('vehicle', 1, t('loading.vehicle'));
+        return map;
+      }),
+      // Perseguidores: sempre a versão leve dos carros da frota.
+      Promise.resolve().then(() =>
+        PURSUER_MODELS.map((id) => {
+          const def = FLEET.find((d) => d.id === id);
+          return def ? buildCarAsset(def.design, true) : null;
+        }),
+      ),
+      // Passageiros com outros rostos (falha num modelo: só não entra na variedade).
+      Promise.all(cfg.character.passengerUrls.map((url) => loadCharacterAsset(assets, cfg, undefined, url).catch(() => null))),
     ]);
 
     progress.set('build', 0, t('loading.colliders'));
@@ -204,10 +195,11 @@ export class Game {
       cfg,
       assets,
       character,
+      passengerAssets.filter((a): a is CharacterAsset => a !== null),
       level,
       audio,
       carAssets,
-      pursuerAssets ?? PURSUER_MODELS.map((id) => carAssets.get(id) ?? null),
+      pursuerAssets,
     );
     progress.set('build', 1, t('loading.graphics'));
     await nextFrame();
@@ -226,6 +218,7 @@ export class Game {
     readonly cfg: Config,
     readonly assets: Assets,
     character: CharacterAsset | null,
+    extraPassengers: CharacterAsset[],
     level: Level,
     readonly audio: AudioSystem,
     carAssets: Map<string, CarAsset | null>,
@@ -308,7 +301,8 @@ export class Game {
     this.carAudio = new CarAudio(audio, this.car, cfg);
     this.playerAudio = new PlayerAudio(audio, this.localPlayer, this.world);
     this.ambientAudio = new AmbientAudio(audio, level);
-    this.rides = new RideManager(level, this.world.scene, this.car.model.rearSeat, character, cfg, {
+    const passengerModels = character ? [character, ...extraPassengers] : [];
+    this.rides = new RideManager(level, this.world.scene, this.car.model.rearSeat, passengerModels, cfg, {
       sound: (id) => audio.play(id),
       toast: (text) => this.showToast(text, 3, 'info'),
       delivered: (f) => this.polarization.delivered(f),

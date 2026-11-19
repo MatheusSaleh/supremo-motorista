@@ -171,8 +171,8 @@ falas e a conta:
   | Seguro "patrimônio público" (3) | −25% nas multas |
   | Película escura (2) | −30% de suspeição nas fotos |
 
-  Os carros também têm preço: Fusão e Corolinha vêm liberados; Equinócio custa R$ 1.500, SW-Quatro R$ 2.500 e
-  Lexo R$ 6.000 ("licitação emergencial"). Compras não contam contra a meta do dia.
+  Os carros também têm preço: Vereda e Pequi vêm liberados; Buriti custa R$ 1.500, Jatobá R$ 2.500 e
+  Solene R$ 6.000 ("licitação emergencial"). Compras não contam contra a meta do dia.
 - **Salvamento automático no navegador:** guarda dia, dinheiro, advertências, melhorias, carros, suspeição, o
   histórico de favores e escândalos e o expediente em andamento. Salva a cada 30 s, a cada corrida, nas
   compras, no fim do dia e ao fechar a página.
@@ -210,20 +210,26 @@ falas e a conta:
 - **Marcos reais como cenário:** TST, PGR, Superintendência da PF, QG do Exército, INSS, Torre de TV, Ponte
   JK, Estádio, Teatro Nacional, Planalto, Alvorada, Museu e Biblioteca Nacional. O Banco do Brasil foi
   trocado pelo fictício Banco Confiança S.A.
-- **Frota oficial:** cinco carros com modelos realistas (CC BY) e nomes paródia, cada um com física, som e
-  efeito na gorjeta. Ficam na garagem do Tribunal e se troca de carro entrando em outro.
+- **Frota oficial fictícia:** cinco carros de montadoras inventadas, gerados em código (sem modelos de
+  terceiros nem desenho de carros reais), cada um com física, som e efeito na gorjeta. Ficam na garagem do
+  Tribunal e se troca de carro entrando em outro.
 
-  | No jogo | Modelo real | Destaque |
+  | No jogo | Categoria | Destaque |
   |---|---|---|
-  | Toiota SW-Quatro | Toyota SW4 | 4x4 diesel, não liga para o gramado |
-  | Toiota Corolinha | Toyota Corolla | leve, turbo recarrega rápido |
-  | Fiord Fusão | Ford Fusion 2017–2020 | referência da frota |
-  | Chevrolé Equinócio | Chevrolet Equinox RS 2022 | SUV média |
-  | Lexo ES 300h | Lexus ES 300h | macio, "turbo elétrico", passageiros pagam mais (sátira da licitação) |
+  | Seriema Jatobá 4x4 | SUV grande, três janelas, barras no teto | 4x4 diesel, não liga para o gramado |
+  | Candanga Pequi | sedã compacto | leve, turbo recarrega rápido |
+  | Candanga Vereda | sedã executivo | referência da frota |
+  | Seriema Buriti | SUV média, teto preto | meio-termo |
+  | Aurora Solene H | sedã de luxo híbrido, grade cromada | macio, "turbo elétrico", passageiros pagam mais (sátira da licitação) |
+
+  Até a Fase 12 a frota usava modelos realistas (CC BY) de carros reais com nomes paródia; eles foram
+  substituídos para o jogo não depender do desenho de nenhuma montadora.
 - **Interior e cockpit:** painel, volante que gira, velocímetro e conta-giros funcionando. As mãos do
   motorista seguem o volante por cinemática inversa (IK). A câmera interna fica na tecla C.
-- **Personagem realista:** Josué e os passageiros são executivos de terno e gravata. Os passageiros sorteiam
-  a cor do terno e o tom de pele a cada corrida.
+- **Personagem realista:** Josué e os passageiros são executivos de terno e gravata. Os passageiros têm dois
+  rostos (dois modelos com o mesmo esqueleto e as mesmas animações) e sorteiam a cor do terno e o tom de pele
+  a cada corrida.
+- **Garagem à noite:** a luminária central do teto acende ao anoitecer (e com chuva forte ou neblina).
 - **Desktop (Electron):** AppImage para Linux e zip para Windows. Pede a GPU dedicada e tem opção de FPS sem
   limite.
 - **Otimizações:**
@@ -245,11 +251,20 @@ falas e a conta:
 
 ## O que falta
 
-### Pendências e melhorias conhecidas
-- **Instalador do Windows:** o `.exe` precisa ser gerado no Windows ou com o Wine; hoje sai só o zip.
-- **Pacote `.deb`:** falha por falta de e-mail do mantenedor e de site do projeto no `package.json`.
-- **Equinox 2025:** não há modelo gratuito realista. Se um modelo comprado for fornecido, a conversão é a
-  mesma dos outros carros (ver ASSETS.md).
-- **Rostos dos passageiros:** todos usam o mesmo modelo de executivo. Mais modelos com esqueleto Mixamo
-  dariam rostos diferentes, reaproveitando as animações.
-- **Interior da garagem à noite:** fica bem escuro. As luminárias do teto poderiam acender.
+### Pendências resolvidas depois da Fase 12
+- **Instalador do Windows:** o workflow `.github/workflows/release.yml` ("Gerar versões") gera o instalador
+  `.exe`, a versão portátil e o zip numa máquina Windows do GitHub Actions, sem precisar de Wine. Roda pela aba
+  Actions ou ao criar uma tag `v*`; os arquivos ficam em Artifacts por 14 dias.
+- **Pacote `.deb`:** e-mail do mantenedor e site do projeto entraram no `package.json`; o pacote sai como
+  `supremo-motorista_<versão>_amd64.deb`.
+- **Carros fictícios:** a frota trocou os modelos de carros reais por carros gerados em código, o que também
+  encerra a pendência do Equinox 2025.
+- **Rostos dos passageiros:** um segundo modelo (Renderpeople, CC BY) entrou na variedade; o conversor agora
+  aceita esqueletos no padrão Renderpeople/Unreal.
+- **Garagem à noite:** a luminária central acende.
+
+### Pendências e ideias
+- **Mais rostos:** outros modelos com esqueleto compatível entram só pela lista `passengerUrls`.
+- **Carros:** o gerador aceita novos desenhos (ver ASSETS.md); dá para ampliar a frota ou dar mais detalhes
+  (para-choques, faróis com lentes, frisos laterais).
+- **Balanceamento:** metas do expediente, gorjetas e suspeição, com base em partidas de teste.

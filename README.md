@@ -98,7 +98,8 @@ O jogo é uma sátira e segue estas regras (valem para qualquer contribuição):
   como cenário**: nunca em corridas, manchetes, falas ou piadas.
 - **Violência só no pastelão.**
 - **Textos sempre no i18n** (`src/data/i18n/`, pt-BR), nunca escritos direto no código.
-- Os carros reproduzem modelos reais, mas aparecem com nomes paródia ("Fiord Fusão", "Lexo ES 300h"…).
+- **Carros fictícios:** montadoras e modelos inventados ("Candanga Vereda", "Aurora Solene H"…), gerados em
+  código (`src/vehicle/carDesign.ts`), sem copiar o desenho de carros reais nem usar marcas.
 
 ## Tecnologia
 
