@@ -30,6 +30,7 @@ export function createCity(seed = 1960): Level {
     const m = b.box(ground, w, 1, d, lawnMaterial(b.mats, w, d), (r.minX + r.maxX) / 2, -0.5, (r.minZ + r.maxZ) / 2);
     m.castShadow = false;
     m.userData.surface = 'grass';
+    m.userData.drape = 'ground'; // deformado antes do resto (drape.ts)
   }
   // O gramado central da Esplanada fica livre de árvores.
   b.occupy({ minX: -EIXO.lawnHalfWidth, maxX: EIXO.lawnHalfWidth, minZ: EIXO.walkStartZ, maxZ: EIXO.walkEndZ });

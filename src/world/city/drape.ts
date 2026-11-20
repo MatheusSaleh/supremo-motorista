@@ -7,17 +7,41 @@
 // Malhas deformadas deixam de ser BoxGeometry, então o World gera trimesh para elas.
 // userData.noDrape = true deixa um objeto (e seus filhos) como está (água, fundo do lago).
 import * as THREE from 'three';
+import { MeshBVH } from 'three-mesh-bvh';
+
+type HeightFn = (x: number, z: number) => number;
 
 /** Até este tamanho (m, maior lado em planta) o objeto sobe inteiro. */
 const RIGID_SIZE = 32;
 /** Arestas mais longas que isto (m, em planta) são divididas antes de deformar. */
 const MAX_EDGE = 24;
+/**
+ * Arestas em que o relevo se afasta mais que isto (m) da reta entre as pontas também são divididas
+ * (até MIN_EDGE). Onde o terreno faz curva (transição das áreas planas, margem do lago), triângulos de
+ * 24 m chegavam a ficar ~1 m acima ou abaixo do relevo, e a grama atravessava o asfalto.
+ */
+const MAX_SAG = 0.015;
+const MIN_EDGE = 1.5;
+/** Altura (m) até a qual uma malha conta como piso (pista, calçada, praça). */
+const FLAT_HEIGHT = 1;
 
-export function drapeOnTerrain(root: THREE.Object3D, heightAt: (x: number, z: number) => number): void {
+/**
+ * O chão (userData.drape = 'ground') é deformado primeiro. Os pisos deformados (pistas, calçadas) seguem
+ * o mais alto entre o relevo e a superfície já triangulada do chão, para nunca ficarem abaixo da grama.
+ */
+export function drapeOnTerrain(root: THREE.Object3D, heightAt: HeightFn): void {
   root.updateMatrixWorld(true);
+  const grounds: THREE.Mesh[] = [];
+  root.traverse((o) => {
+    if (o instanceof THREE.Mesh && o.userData.drape === 'ground') grounds.push(o);
+  });
+  for (const g of grounds) deformMesh(g, heightAt, heightAt);
+  const groundAt = groundSampler(grounds);
+  const surfaceAt: HeightFn = (x, z) => Math.max(heightAt(x, z), groundAt(x, z) ?? -Infinity);
+
   const box = new THREE.Box3();
   const visit = (obj: THREE.Object3D) => {
-    if (obj.userData.noDrape) return;
+    if (obj.userData.noDrape || obj.userData.drape === 'ground') return;
     if (obj instanceof THREE.InstancedMesh) {
       shiftInstances(obj, heightAt);
       return;
@@ -36,7 +60,11 @@ export function drapeOnTerrain(root: THREE.Object3D, heightAt: (x: number, z: nu
         liftWorld(obj, dy);
         return; // os filhos sobem junto
       }
-      if (obj instanceof THREE.Mesh) deformMesh(obj, heightAt);
+      if (obj instanceof THREE.Mesh) {
+        // Só pisos disputam espaço com a grama; prédios e muros seguem o relevo.
+        const flat = box.max.y - box.min.y <= FLAT_HEIGHT;
+        deformMesh(obj, flat ? surfaceAt : heightAt, heightAt);
+      }
     }
     for (const child of [...obj.children]) visit(child);
   };
@@ -72,7 +100,7 @@ function liftWorld(obj: THREE.Object3D, dy: number): void {
   obj.updateMatrixWorld(true);
 }
 
-function shiftInstances(mesh: THREE.InstancedMesh, heightAt: (x: number, z: number) => number): void {
+function shiftInstances(mesh: THREE.InstancedMesh, heightAt: HeightFn): void {
   const inst = new THREE.Matrix4();
   const world = new THREE.Matrix4();
   const inv = mesh.matrixWorld.clone().invert();
@@ -87,8 +115,31 @@ function shiftInstances(mesh: THREE.InstancedMesh, heightAt: (x: number, z: numb
   mesh.computeBoundingBox();
 }
 
-/** Subdivide (em espaço de mundo) e desloca cada vértice pela altura do terreno. */
-function deformMesh(mesh: THREE.Mesh, heightAt: (x: number, z: number) => number): void {
+/** Altura (mundo) da face de cima das malhas do chão já deformadas em (x, z); null fora delas. */
+function groundSampler(grounds: THREE.Mesh[]): (x: number, z: number) => number | null {
+  const parts = grounds.map((mesh) => {
+    mesh.updateMatrixWorld(true);
+    return { mesh, bvh: new MeshBVH(mesh.geometry), inv: mesh.matrixWorld.clone().invert() };
+  });
+  const ray = new THREE.Ray();
+  const down = new THREE.Vector3(0, -1, 0);
+  const origin = new THREE.Vector3();
+  return (x, z) => {
+    for (const { mesh, bvh, inv } of parts) {
+      ray.set(origin.set(x, 1e4, z), down).applyMatrix4(inv);
+      const hit = bvh.raycastFirst(ray, THREE.FrontSide);
+      if (hit) return hit.point.applyMatrix4(mesh.matrixWorld).y;
+    }
+    return null;
+  };
+}
+
+/**
+ * Subdivide (em espaço de mundo) e desloca cada vértice por `heightAt`. `relief` decide onde subdividir.
+ * O critério de divisão depende só da aresta (comprimento e desvio do relevo), então os dois triângulos
+ * que a compartilham a dividem igual: a malha continua sem frestas.
+ */
+function deformMesh(mesh: THREE.Mesh, heightAt: HeightFn, relief: HeightFn): void {
   const src = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
   const names = Object.keys(src.attributes).filter((n) => n === 'position' || n === 'normal' || n === 'uv');
   const m = mesh.matrixWorld;
@@ -105,12 +156,19 @@ function deformMesh(mesh: THREE.Mesh, heightAt: (x: number, z: number) => number
   type V = number[][];
   const lerp = (a: V, b: V): V => a.map((arr, k) => arr.map((x, j) => (x + b[k][j]) / 2));
   const xz2 = (a: V, b: V) => (a[0][0] - b[0][0]) ** 2 + (a[0][2] - b[0][2]) ** 2;
+  const sag = (a: V, b: V) =>
+    Math.abs(relief((a[0][0] + b[0][0]) / 2, (a[0][2] + b[0][2]) / 2) - (relief(a[0][0], a[0][2]) + relief(b[0][0], b[0][2])) / 2);
+  /** Comprimento² da aresta se ela precisa ser dividida; 0 se não. */
+  const split = (a: V, b: V) => {
+    const l2 = xz2(a, b);
+    return l2 > MAX_EDGE * MAX_EDGE || (l2 > MIN_EDGE * MIN_EDGE && sag(a, b) > MAX_SAG) ? l2 : 0;
+  };
   const emit = (a: V, b: V, c: V, depth: number) => {
     if (depth === 0 && buriedBottom(a[0], b[0], c[0])) return;
-    const e = [xz2(a, b), xz2(b, c), xz2(c, a)];
+    const e = [split(a, b), split(b, c), split(c, a)];
     const longest = Math.max(...e);
-    if (longest > MAX_EDGE * MAX_EDGE && depth < 16) {
-      // Divide a aresta mais longa ao meio (mantém triângulos bem formados).
+    if (longest > 0 && depth < 40) {
+      // Divide ao meio a mais longa das arestas que precisam (mantém triângulos bem formados).
       if (longest === e[0]) {
         const m = lerp(a, b);
         emit(a, m, c, depth + 1);
