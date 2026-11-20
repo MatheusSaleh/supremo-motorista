@@ -108,6 +108,7 @@ TypeScript (strict) + Vite, three.js puro, Rapier (física, `@dimforge/rapier3d-
 electron-builder no desktop. Nenhum outro framework.
 
 Como o código está organizado: [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
+Multiplayer (modo livre), servidor e instalação na VPS: [docs/MULTIPLAYER.md](docs/MULTIPLAYER.md).
 Modelos, sons e dados externos (e como adicionar novos): [docs/ASSETS.md](docs/ASSETS.md).
 
 ## Estrutura

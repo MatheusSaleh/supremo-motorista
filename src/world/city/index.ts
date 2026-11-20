@@ -1,12 +1,12 @@
 // Gerador procedural da "Brasília condensada". Só produz um Level: o World cria os colisores a partir
 // das malhas. Para trocar por um .glb do OpenStreetMap (Blosm), use levelFromGLTF() e não mexa no resto.
-import type { Level } from '../Level';
+import type { GarageSlot, Level } from '../Level';
 import { buildAeroporto } from './aeroporto';
 import { CityBuilder, type Rect } from './builder';
 import { buildEixao } from './eixao';
 import { buildEsplanada } from './esplanada';
 import { buildLago, lakeWater } from './lago';
-import { BOUNDS, EIXO, LAKE } from './layout';
+import { BOUNDS, EIXO, LAKE, garageLayout } from './layout';
 import { lawnMaterial } from './materials';
 import { buildMarcos } from './marcos';
 import { buildPonte } from './ponte';
@@ -36,7 +36,7 @@ export function createCity(seed = 1960): Level {
   b.occupy({ minX: -EIXO.lawnHalfWidth, maxX: EIXO.lawnHalfWidth, minZ: EIXO.walkStartZ, maxZ: EIXO.walkEndZ });
 
   buildEsplanada(b);
-  buildPraca(b);
+  const garageLamps = buildPraca(b);
   buildLago(b);
   buildEixao(b);
   buildAeroporto(b);
@@ -56,16 +56,22 @@ export function createCity(seed = 1960): Level {
   if (import.meta.env.DEV) console.info(`[cidade] relevo: escala vertical ${terrain.verticalScale.toFixed(2)}, Praça ${heightAt(0, -1150).toFixed(1)} m, Rodoviária ${heightAt(0, 960).toFixed(1)} m, Torre ${heightAt(0, 1620).toFixed(1)} m`);
 
   b.root.updateMatrixWorld(true);
-  const s = garageSpawns();
   const onGround = <T extends { x: number; y: number; z: number }>(p: T) => ((p.y += heightAt(p.x, p.z)), p);
-  onGround(s.player);
-  for (const f of s.fleet) onGround(f.position);
+  const garages: GarageSlot[] = garageLamps.map((lamp, i) => {
+    const s = garageSpawns(i);
+    onGround(s.player);
+    for (const f of s.fleet) onGround(f.position);
+    const { x, z } = garageLayout(i);
+    return { center: { x, z }, spawn: s.player, spawnYaw: s.playerYaw, fleet: s.fleet, lamp };
+  });
+  const home = garages[0];
   return {
     root: b.root,
-    spawn: s.player,
-    spawnYaw: s.playerYaw,
-    vehicleSpawn: s.fleet[2],
-    fleetSpawns: s.fleet,
+    spawn: home.spawn,
+    spawnYaw: home.spawnYaw,
+    vehicleSpawn: home.fleet[2],
+    fleetSpawns: home.fleet,
+    garages,
     heightAt,
     roads: b.roadSegments,
     landmarks: b.landmarks,

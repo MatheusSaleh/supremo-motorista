@@ -105,5 +105,8 @@ export const PURSUIT = {
   escapeBonus: 30,
 };
 
-/** Modelos da frota reaproveitados pelos perseguidores (versões leves), na ordem dos carros do pool. */
-export const PURSUER_MODELS = ['fusao', 'equinocio', 'corolinha', 'sw4'];
+/**
+ * Modelos da frota reaproveitados pelos perseguidores (versões leves), na ordem dos carros do pool. No
+ * multiplayer o pool é dividido pela sala inteira (no máximo src/net/protocol.ts → MAX_NET_PURSUERS).
+ */
+export const PURSUER_MODELS = ['fusao', 'equinocio', 'corolinha', 'sw4', 'equinocio', 'fusao'];

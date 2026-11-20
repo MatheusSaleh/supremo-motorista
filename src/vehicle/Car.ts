@@ -40,7 +40,7 @@ const NO_MODS: CarMods = { engine: 1, speed: 1, grip: 1, turboRecharge: 1, turbo
 export const NO_CONTROLS: Readonly<CarControls> = { throttle: 0, steer: 0, handbrake: false, turbo: false };
 
 /** Altura dos pontos de fixação das rodas no espaço do chassi. */
-const WHEEL_Y = -0.08;
+export const WHEEL_Y = -0.08;
 
 export class Car {
   readonly model: CarModel;

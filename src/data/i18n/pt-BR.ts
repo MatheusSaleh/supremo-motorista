@@ -4,6 +4,7 @@ import { campaignPtBR } from './pt-BR.campaign';
 import { careerPtBR } from './pt-BR.career';
 import { environmentPtBR } from './pt-BR.environment';
 import { factionsPtBR } from './pt-BR.factions';
+import { netPtBR } from './pt-BR.net';
 import { ridesPtBR } from './pt-BR.rides';
 import { vehiclesPtBR } from './pt-BR.vehicles';
 
@@ -20,6 +21,7 @@ export const ptBR = {
   ...archetypesPtBR,
   ...careerPtBR,
   ...campaignPtBR,
+  ...netPtBR,
   'game.title': 'Supremo Motorista',
   'game.subtitle': 'Transporte Oficial do Tribunal',
 

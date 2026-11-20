@@ -59,7 +59,7 @@ export function setupDevTools(game: Game): () => void {
   fa.add(game.polarization.heat, 'vermelhos', 0, 100, 1).name('calor Vermelhos').listen();
   fa.add(game.polarization.heat, 'amarelos', 0, 100, 1).name('calor Amarelos').listen();
   fa.add({ fire: () => Object.assign(game.polarization.heat, { vermelhos: 90, amarelos: 90 }) }, 'fire').name('provocar os dois (90)');
-  fa.add({ calm: () => (game.polarization.reset(), game.pursuers.clear()) }, 'calm').name('zerar e tirar de cena');
+  fa.add({ calm: () => (game.polarization.reset(), game.net.clearMyPursuers()) }, 'calm').name('zerar e tirar de cena');
   fa.close();
 
   // Banqueiro (Fase 9): ligação do Dr. Caixeta, suspeição (imprensa a partir de 35/70; escândalo em 100).

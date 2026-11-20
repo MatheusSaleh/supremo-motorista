@@ -15,6 +15,7 @@ export const vehiclesPtBR = {
 
   'hud.prompt.enterNamed': 'Entrar: {name}',
   'garage.fleet': 'Frota do Tribunal',
+  'garage.slot': 'Garagem {n}',
 
   // Falas extras de embarque, por carro.
   'line.board.sw4.1': 'A caminhonete! Ótimo, hoje eu tenho audiência no gramado.',

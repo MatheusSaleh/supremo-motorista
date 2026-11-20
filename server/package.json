@@ -1,0 +1,24 @@
+{
+  "name": "supremo-motorista-server",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Servidor do multiplayer (modo livre) do Supremo Motorista",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node index.ts",
+    "dev": "node --watch index.ts",
+    "server": "node --watch index.ts",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "ws": "^8.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/ws": "^8.18.2",
+    "typescript": "^7.0.2"
+  }
+}

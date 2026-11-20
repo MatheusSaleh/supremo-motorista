@@ -24,7 +24,7 @@ import { Atmosphere } from '../env/Atmosphere';
 import { Environment, type EnvSnapshot } from '../env/Environment';
 import { FACTIONS, MAX_PURSUERS, POLARIZATION, PURSUER_MODELS, TERRITORIES, other, type Territory } from '../data/factions';
 import { Polarization } from '../factions/Polarization';
-import { Pursuers, type PursuitEvent } from '../factions/Pursuers';
+import { LOCAL_TARGET, Pursuers, allocateWants, type PursuitEvent, type PursuitTarget } from '../factions/Pursuers';
 import { Suspicion } from '../factions/Suspicion';
 import { FAVORS, SUSPICION } from '../data/banker';
 import { Career, type ShiftEvent } from '../career/Career';
@@ -37,12 +37,14 @@ import { RoadGraph } from '../world/RoadGraph';
 import { SeatedDriver } from '../player/SeatedDriver';
 import { World } from '../world/World';
 import { createCity } from '../world/city';
-import { levelFromGLTF, type Level } from '../world/Level';
+import { levelFromGLTF, type GarageSlot, type Level } from '../world/Level';
 import { createTestArena } from '../world/testArena';
 import { Assets } from './Assets';
 import { installBVH } from './bvh';
 import { t } from './i18n';
 import { Input } from './Input';
+import { Multiplayer } from '../net/Multiplayer';
+import { FLAG, type PlayerState, type PursuitWants } from '../net/protocol';
 import { ProgressTracker, nextFrame, type ProgressCallback } from './progress';
 import { loadSettings, saveSettings, type Settings } from './Settings';
 
@@ -89,6 +91,14 @@ export class Game {
   /** Fase 9: Medidor de Suspeição (favores do Dr. Caixeta, imprensa, Corregedoria). */
   readonly suspicion = new Suspicion();
   private suspicionWarned = false;
+  /** Multiplayer (modo livre): outros jogadores dirigindo pela mesma cidade. */
+  readonly net: Multiplayer;
+  private readonly netState: PlayerState = { flags: 0, vehicle: 0, x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1, speed: 0, steer: 0 };
+  /** O jogador deste computador como alvo dos perseguidores, e quantos ele atrai agora. */
+  private readonly localTarget: PursuitTarget = { id: LOCAL_TARGET, position: new THREE.Vector3(), velocity: { x: 0, y: 0, z: 0 }, collider: null };
+  private myWants: PursuitWants = { vermelhos: 0, amarelos: 0, imprensa: 0 };
+  /** Garagem deste jogador (Level.garages): a 0 no solo; no multiplayer, a que o servidor der. */
+  private garageIndex = 0;
   /** Fase 11: carreira (dias, Oficina, salvamento) e as telas dela. */
   readonly career: Career;
   private readonly careerScreens: CareerScreens;
@@ -264,6 +274,26 @@ export class Game {
     const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     for (const c of [...this.cars, ...this.pursuers.all]) c.model.setEnvironment(env);
     pmrem.dispose();
+    // Carros dos outros jogadores: versão leve do modelo, gerada na primeira vez que alguém usa cada um.
+    const remoteCars = new Map<string, CarAsset | null>();
+    this.net = new Multiplayer(
+      cfg,
+      this.world.scene,
+      this.physics,
+      {
+        carAsset: (def) => {
+          if (!remoteCars.has(def.id)) remoteCars.set(def.id, buildCarAsset(def.design, true));
+          return remoteCars.get(def.id) ?? null;
+        },
+        environment: env,
+        addLights: (root) => this.atmosphere.addLightRoot(root),
+        removeLights: (root) => this.atmosphere.removeLightRoot(root),
+      },
+      (info) => this.hud?.pauseMenu.setOnline(info),
+      (kind, name) => this.showToast(t(kind === 'join' ? 'online.joined' : 'online.left', { name }), 3, 'info'),
+      (index) => this.setGarage(index),
+    );
+    this.net.attachPursuers(this.pursuers);
     this.driver = character ? new SeatedDriver(character, cfg) : null;
     if (this.driver) this.car.model.seat.add(this.driver.root);
     for (const c of this.cars) this.world.scene.add(c.model.root);
@@ -416,6 +446,7 @@ export class Game {
   applySettings(s: Settings): void {
     this.settings = s;
     saveSettings(s);
+    this.net.setEnabled(s.online && this.cfg.multiplayer.enabled, s.nickname);
     this.world.setShadowMapSize(s.shadowMapSize);
     this.world.setShadowsEnabled(s.shadows);
     this.world.setShadowRange(s.shadowRange);
@@ -443,6 +474,7 @@ export class Game {
     this.pursuers.dispose();
     this.atmosphere.dispose();
     this.rides.dispose();
+    this.net.dispose();
     this.driver?.dispose();
     this.physics.free();
     this.assets.dispose();
@@ -464,6 +496,9 @@ export class Game {
     }
 
     if (!this.paused && !this.modal) this.simulate(dt);
+    this.net.update(dt, this.camera);
+    this.net.syncPursuit(dt, this.myWants);
+    this.net.sendLocal(dt, this.localNetState(), !this.paused && !this.modal && this.menuOrbit === null);
     this.careerScreens.updateBadge(this.career, this.rides.money);
     if (this.menuOrbit !== null) this.orbitCamera(dt);
     this.updateMusic();
@@ -492,7 +527,7 @@ export class Game {
         suspicion: this.suspicion.value,
         press: this.pursuers.pressCount,
       },
-      others: this.pursuers.actors(),
+      others: [...this.pursuers.actors(), ...this.net.actors()],
     });
     this.renderer.render(this.world.scene, this.camera);
 
@@ -524,10 +559,22 @@ export class Game {
       if (this.input.consumePressed('Space')) this.localPlayer.requestJump();
     }
 
-    // Perseguidores decidem (com as posições do frame anterior) antes da física.
-    const pursuit = this.pursuers.think(dt, this.car, this.polarization, this.camera, MAX_PURSUERS[this.settings.quality], this.suspicion.wantedPress());
+    // Perseguidores decidem (com as posições do frame anterior) antes da física. No multiplayer, quem
+    // roda a IA (o anfitrião) caça também os outros jogadores; os eventos que me atingem podem vir da rede.
+    this.myWants = allocateWants(this.polarization, this.suspicion.wantedPress(), MAX_PURSUERS[this.settings.quality]);
+    const lt = this.localTarget;
+    const lv = this.car.body.linvel();
+    lt.position.copy(this.car.position);
+    Object.assign(lt.velocity, { x: lv.x, y: lv.y, z: lv.z });
+    lt.collider = this.car.body.collider(0);
+    const pursuit = [
+      ...this.pursuers.think(dt, [{ target: lt, wants: this.myWants }, ...this.net.remoteTargets()], this.camera),
+      ...this.net.drainPursuitEvents(),
+    ];
 
     // 2) Física em passo fixo
+    this.net.beforePhysics();
+    this.pursuers.beforePhysics();
     this.physics.gravity = { x: 0, y: -this.cfg.physics.gravity, z: 0 };
     this.accumulator += dt;
     let steps = 0;
@@ -602,6 +649,44 @@ export class Game {
     } else {
       this.cameraRig.update(dt, this.localPlayer.position);
     }
+  }
+
+  /** Estado do jogador local para o multiplayer: o carro (dirigindo) ou a posição do Josué (a pé). */
+  private localNetState(): PlayerState {
+    const s = this.netState;
+    const car = this.car;
+    s.vehicle = Math.max(0, FLEET.findIndex((d) => d === car.def));
+    if (this.mode === 'driving') {
+      const root = car.model.root;
+      s.x = root.position.x;
+      s.y = root.position.y;
+      s.z = root.position.z;
+      s.qx = root.quaternion.x;
+      s.qy = root.quaternion.y;
+      s.qz = root.quaternion.z;
+      s.qw = root.quaternion.w;
+      s.speed = car.forwardSpeed;
+      s.steer = car.steerAngle;
+      s.flags =
+        (car.braking ? FLAG.BRAKE : 0) |
+        (car.reversing ? FLAG.REVERSE : 0) |
+        (car.turboActive ? FLAG.TURBO : 0) |
+        (this.input.isDown('KeyH') ? FLAG.HORN : 0);
+    } else {
+      const p = this.localPlayer.position;
+      const q = this.localPlayer.avatar.root.quaternion;
+      s.x = p.x;
+      s.y = p.y;
+      s.z = p.z;
+      s.qx = q.x;
+      s.qy = q.y;
+      s.qz = q.z;
+      s.qw = q.w;
+      s.speed = 0;
+      s.steer = 0;
+      s.flags = FLAG.ON_FOOT;
+    }
+    return s;
   }
 
   /** Carro da frota mais próximo de Josué, ao alcance para entrar. */
@@ -719,6 +804,7 @@ export class Game {
         this.showToast(t('toast.pursuit.escape', { faction: name }), 3, 'info');
         this.rides.pursuerEscaped();
       } else if (e.type === 'tomato') {
+        this.car.dirt = Math.min(1, this.car.dirt + 0.04);
         this.rides.tomatoHit();
       } else if (e.type === 'ram') {
         // Só conta quando é o jogador que parte para cima (não quando apanha parado).
@@ -734,13 +820,52 @@ export class Game {
     return t('hud.prompt.locked', { name: t(nameKey), price: (CAR_PRICES[id] ?? 0).toLocaleString('pt-BR') });
   }
 
-  /** Perto da garagem do Tribunal: a pé, ou parado dentro do carro. */
+  /** Garagem deste jogador (null em níveis sem garagens). */
+  private get myGarage(): GarageSlot | null {
+    return this.world.level?.garages?.[this.garageIndex] ?? null;
+  }
+
+  /** Centro da garagem deste jogador (oficina, lavagem, imunidade). */
+  private garageCenter(): { x: number; z: number } | null {
+    return this.myGarage?.center ?? this.world.level?.addresses.find((a) => a.id === 'garagem') ?? null;
+  }
+
+  /**
+   * Muda a garagem deste jogador (multiplayer: a que o servidor deu na sala). Os carros que estavam
+   * estacionados na garagem antiga, e o Josué se estiver nela a pé, vão para a nova; a luz noturna vai junto.
+   */
+  private setGarage(index: number): void {
+    const garages = this.world.level?.garages;
+    if (!garages?.length) return;
+    const next = Math.max(0, Math.min(index, garages.length - 1));
+    if (next === this.garageIndex) return;
+    const from = garages[this.garageIndex];
+    const to = garages[next];
+    this.garageIndex = next;
+    const inside = (p: { x: number; z: number }) => Math.hypot(p.x - from.center.x, p.z - from.center.z) < 30;
+    const driving = this.mode === 'driving';
+    this.cars.forEach((c, i) => {
+      if ((driving && c === this.car) || !inside(c.position)) return;
+      const spot = to.fleet[i] ?? to.fleet[0];
+      c.reset(spot.position, spot.yaw);
+      c.update(1);
+    });
+    if (!driving && inside(this.localPlayer.position)) {
+      this.localPlayer.teleport(to.spawn.x, to.spawn.y, to.spawn.z, to.spawnYaw);
+      this.cameraRig.yaw = to.spawnYaw + Math.PI;
+    }
+    const light = from.lamp.getObjectByName('luz-garagem');
+    if (light) to.lamp.add(light);
+    Object.assign(this.safePlayer, { x: to.spawn.x, y: to.spawn.y, z: to.spawn.z, yaw: to.spawnYaw });
+  }
+
+  /** Perto da garagem deste jogador: a pé, ou parado dentro do carro. */
   private atWorkshop(): boolean {
-    const garage = this.world.level?.addresses.find((a) => a.id === 'garagem');
+    const garage = this.garageCenter();
     if (!garage) return false;
     const driving = this.mode === 'driving';
     const p = driving ? this.car.position : this.localPlayer.position;
-    return Math.hypot(p.x - garage.x, p.z - garage.z) < 30 && (!driving || Math.abs(this.car.forwardSpeed) < 1);
+    return Math.hypot(p.x - garage.x, p.z - garage.z) < 28 && (!driving || Math.abs(this.car.forwardSpeed) < 1);
   }
 
   /** Melhorias da Oficina em todos os carros da frota e no pagamento das multas. */
@@ -809,15 +934,18 @@ export class Game {
       this.car.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
       this.tryExitCar();
     }
-    const spots = level.fleetSpawns ?? [level.vehicleSpawn];
+    const home = this.myGarage;
+    const spots = home?.fleet ?? level.fleetSpawns ?? [level.vehicleSpawn];
     this.cars.forEach((c, i) => {
       const spot = spots[i] ?? spots[0];
       c.reset(spot.position, spot.yaw);
       this.carEffects.repair(c);
     });
-    this.localPlayer.teleport(level.spawn.x, level.spawn.y, level.spawn.z, level.spawnYaw);
-    this.cameraRig.yaw = level.spawnYaw + Math.PI;
-    this.pursuers.clear();
+    const spawn = home?.spawn ?? level.spawn;
+    const spawnYaw = home?.spawnYaw ?? level.spawnYaw;
+    this.localPlayer.teleport(spawn.x, spawn.y, spawn.z, spawnYaw);
+    this.cameraRig.yaw = spawnYaw + Math.PI;
+    this.net.clearMyPursuers();
     this.polarization.reset();
     this.rides.resetForNewDay();
     this.dayChases = 0;
@@ -1047,7 +1175,7 @@ export class Game {
     const fine = sus.scandal(this.rides.money);
     this.career.scandal();
     const maleta = this.rides.scandal(fine, SUSPICION.scandalQuiet);
-    this.pursuers.clear();
+    this.net.clearMyPursuers();
     this.audio.play('uiError');
     this.hud.showHeadline(t('scandal.paper'), t('scandal.headline'), t('scandal.sub', { fine: fine.toLocaleString('pt-BR'), maleta: maleta ? t('scandal.maleta') : '' }));
   }
@@ -1202,9 +1330,9 @@ export class Game {
     this.camera.updateProjectionMatrix();
   }
 
-  /** Parar o carro na garagem do Tribunal por um instante: a frota lava e desamassa. */
+  /** Parar o carro na garagem do jogador por um instante: a frota lava e desamassa. */
   private updateGarageService(dt: number): void {
-    const garage = this.world.level?.addresses.find((a) => a.id === 'garagem');
+    const garage = this.garageCenter();
     const p = this.car.position;
     const parked = garage && Math.hypot(p.x - garage.x, p.z - garage.z) < 26 && Math.abs(this.car.forwardSpeed) < 1;
     const needsService = this.car.dirt > 0.05 || this.car.damaged;

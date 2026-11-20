@@ -59,6 +59,7 @@ A cantada de pneu não usa arquivo: é ruído filtrado gerado em tempo real (`sr
 Dependências npm (three.js, Rapier, three-mesh-bvh, lil-gui, stats.js) seguem as licenças de cada pacote em `node_modules/`.
 A versão desktop usa Electron (MIT) e electron-builder (MIT); o app empacotado inclui o Chromium, cujas licenças
 acompanham o instalador (`LICENSE.electron.txt`, `LICENSES.chromium.html`).
+O servidor do multiplayer (`server/`, fora do jogo distribuído) usa a biblioteca `ws` (MIT).
 
 ## Ícone
 

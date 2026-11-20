@@ -755,7 +755,8 @@ kbd {
   justify-content: flex-start;
 }
 
-.hud-panel select {
+.hud-panel select,
+.hud-panel input[type='text'] {
   min-width: 150px;
   padding: 5px 8px;
   border: 1px solid var(--hud-border);

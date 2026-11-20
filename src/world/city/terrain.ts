@@ -6,7 +6,7 @@
 //  - zerado no lago e subindo suavemente a partir da margem.
 import { inRect, rectOf, type Rect } from './builder';
 import { LAKE_RECT } from './lago';
-import { PRACA, ROAD_OUTER } from './layout';
+import { GARAGES, PRACA, ROAD_OUTER, garageRoadEndX } from './layout';
 import { TERRAIN_DATA as D } from './terrainData';
 
 export interface Terrain {
@@ -28,12 +28,17 @@ const SHORE_RAMP = 280;
 const SMOOTH_SIGMA = 1.6; // em células da grade (~160 m)
 
 /**
- * Áreas que precisam ficar planas (garagem com o acesso, palácios, praça): o terreno fica na altura do
+ * Áreas que precisam ficar planas (garagens com a rua de serviço, palácios, praça): o terreno fica na altura do
  * centro de cada área e volta ao relevo em FLAT_BLEND metros. Sem isso, construções grandes e vazadas
  * (a garagem) entortam e os carros estacionados escorregam.
  */
 const FLAT_ZONES: Rect[] = [
-  { minX: ROAD_OUTER - 4, maxX: PRACA.garage.x + PRACA.garage.w / 2 + 6, minZ: PRACA.garage.z - PRACA.garage.d / 2 - 8, maxZ: PRACA.garage.z + PRACA.garage.d / 2 + 8 },
+  {
+    minX: ROAD_OUTER - 4,
+    maxX: garageRoadEndX() + 6,
+    minZ: GARAGES.roadZ - 6 - GARAGES.gap - GARAGES.d - 8,
+    maxZ: GARAGES.roadZ + 6 + GARAGES.gap + GARAGES.d + 8,
+  },
   rectOf(PRACA.tribunal.x, PRACA.tribunal.z, PRACA.tribunal.w + 20, PRACA.tribunal.d + 20),
   rectOf(PRACA.palacio.x, PRACA.palacio.z, PRACA.palacio.w + 20, PRACA.palacio.d + 20),
   PRACA.plaza,

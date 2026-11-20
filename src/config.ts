@@ -137,6 +137,24 @@ export const config = {
     fogFar: 2600, // o Congresso continua visível da Rodoviária (~1,9 km)
     sunDirection: { x: -0.5, y: 0.8, z: 0.35 },
   },
+
+  // Multiplayer (modo livre): ver docs/MULTIPLAYER.md. VITE_MP_URL troca o servidor no build.
+  multiplayer: {
+    /**
+     * Opção "Online" disponível: sempre em dev; no build de produção só com VITE_MP_ENABLED=true (ligar
+     * na Vercel depois que o servidor estiver no ar, senão o jogador só veria "servidor indisponível").
+     */
+    enabled: import.meta.env.DEV || import.meta.env.VITE_MP_ENABLED === 'true',
+    // Em dev, o servidor local no mesmo endereço da página (funciona também de outro PC da rede).
+    url: (import.meta.env.VITE_MP_URL as string | undefined) ?? (import.meta.env.DEV ? `ws://${location.hostname}:8787` : 'wss://mp.matheussaleh.com.br'),
+    /** Atraso (s) com que os outros jogadores são desenhados: dá margem para interpolar entre pacotes. */
+    interpDelay: 0.1,
+    /** Por quanto tempo (s) um carro remoto é projetado para frente quando os pacotes atrasam. */
+    maxExtrapolation: 0.25,
+    /** Espera (s) entre tentativas de reconexão: começa curta e dobra até o máximo. */
+    reconnectMin: 2,
+    reconnectMax: 30,
+  },
 };
 
 export type Config = typeof config;

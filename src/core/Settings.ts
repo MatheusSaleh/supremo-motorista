@@ -19,6 +19,9 @@ export interface Settings {
   minimapRotate: boolean;
   /** Clima, horário e feriados reais de Brasília (APIs públicas); desligado = 14h, céu limpo. */
   realWorld: boolean;
+  /** Multiplayer (modo livre) ligado e o apelido mostrado aos outros. */
+  online: boolean;
+  nickname: string;
   audio: Volumes;
 }
 
@@ -42,6 +45,8 @@ export function defaultSettings(): Settings {
     showFps: false,
     minimapRotate: true,
     realWorld: true,
+    online: false,
+    nickname: '',
     audio: { master: 0.8, vehicle: 1, sfx: 1, ambient: 0.8, ui: 0.8, music: 0.6, muted: false },
   };
 }

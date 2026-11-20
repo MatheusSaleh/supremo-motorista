@@ -31,6 +31,16 @@ export interface WaterArea extends LevelBounds {
   level: number;
 }
 
+export interface GarageSlot {
+  /** Centro da garagem em planta (oficina, imunidade, lavagem). */
+  center: { x: number; z: number };
+  spawn: THREE.Vector3;
+  spawnYaw: number;
+  fleet: { position: THREE.Vector3; yaw: number }[];
+  /** Luminária do meio (a luz noturna da garagem do jogador fica nela). */
+  lamp: THREE.Object3D;
+}
+
 export interface Level {
   root: THREE.Object3D;
   /** Posição dos pés no spawn. */
@@ -41,6 +51,11 @@ export interface Level {
   vehicleSpawn: { position: THREE.Vector3; yaw: number };
   /** Vagas da frota, na ordem de data/vehicles FLEET (opcional: sem elas, só o carro padrão). */
   fleetSpawns?: { position: THREE.Vector3; yaw: number }[];
+  /**
+   * Garagens (cidade): a 0 é a do jogo solo; no multiplayer cada jogador da sala fica com uma. Sem elas,
+   * vale spawn/fleetSpawns.
+   */
+  garages?: GarageSlot[];
   /** Pontos de interesse (minimapa, teleporte de debug). */
   landmarks: Landmark[];
   /** Área jogável (minimapa). */

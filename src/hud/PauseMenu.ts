@@ -1,7 +1,10 @@
 // Menu de pausa com ajustes de qualidade. Só manipula Settings; quem aplica é o Game (via onChange).
+import { config } from '../config';
 import { desktop } from '../core/desktop';
 import { t } from '../core/i18n';
 import { QUALITY_PRESETS, type QualityPreset, type Settings } from '../core/Settings';
+import type { MultiplayerInfo } from '../net/Multiplayer';
+import { NAME_MAX, cleanName } from '../net/protocol';
 import { CONTROL_HINTS, keyLabel, type HudMode } from './controls';
 
 export interface PauseMenuCallbacks {
@@ -46,6 +49,9 @@ export class PauseMenu {
   private readonly muted: HTMLInputElement;
   private readonly careerInfo: HTMLElement;
   private readonly volumeInputs: HTMLInputElement[];
+  private readonly online: HTMLInputElement;
+  private readonly nickname: HTMLInputElement;
+  private readonly onlineStatus: HTMLElement;
 
   constructor(
     private settings: Settings,
@@ -65,6 +71,7 @@ export class PauseMenu {
           <button type="button" role="tab" data-tab="audio" aria-selected="false">${t('pause.audio')}</button>
           <button type="button" role="tab" data-tab="controls" aria-selected="false">${t('pause.controls')}</button>
           <button type="button" role="tab" data-tab="career" aria-selected="false">${t('pause.career')}</button>
+          <button type="button" role="tab" data-tab="online" aria-selected="false">${t('pause.online')}</button>
         </div>
         <section data-panel="graphics">
           <label>${t('pause.quality')}
@@ -111,6 +118,14 @@ export class PauseMenu {
           <div data-ref="careerInfo"></div>
           <button type="button" class="hud-secondary" data-ref="toMenu">${t('menu.toMenu')}</button>
           <button type="button" class="hud-secondary" data-ref="newGame">${t('career.reset')}</button>
+        </section>
+        <section data-panel="online" hidden>
+          <label class="hud-check"><input type="checkbox" data-ref="online" /> ${t('online.enable')}</label>
+          <label>${t('online.name')}
+            <input type="text" data-ref="nickname" maxlength="${NAME_MAX}" autocomplete="nickname" spellcheck="false" placeholder="${t('online.namePlaceholder')}" />
+          </label>
+          <p class="hud-note" data-ref="onlineStatus">${t('online.status.off')}</p>
+          <p class="hud-note">${t('online.note')}</p>
         </section>
         <section data-panel="controls" class="hud-controls-grid" hidden>
           <div><h3>${t('pause.controls.onFoot')}</h3><ul class="hud-keys">${controlsList('onFoot')}</ul></div>
@@ -165,6 +180,24 @@ export class PauseMenu {
     this.showFps.addEventListener('change', () => this.update({ showFps: this.showFps.checked }));
     this.minimapRotate.addEventListener('change', () => this.update({ minimapRotate: this.minimapRotate.checked }));
     this.realWorld.addEventListener('change', () => this.update({ realWorld: this.realWorld.checked }));
+    // Sem servidor no ar (build de produção sem VITE_MP_ENABLED), a aba Online nem aparece.
+    if (!config.multiplayer.enabled) {
+      el.querySelector<HTMLElement>('[data-tab="online"]')!.hidden = true;
+      el.querySelector<HTMLElement>('[data-panel="online"]')!.remove();
+    }
+    this.online = el.querySelector<HTMLInputElement>('[data-ref="online"]') ?? document.createElement('input');
+    this.nickname = el.querySelector<HTMLInputElement>('[data-ref="nickname"]') ?? document.createElement('input');
+    this.onlineStatus = el.querySelector<HTMLElement>('[data-ref="onlineStatus"]') ?? document.createElement('p');
+    this.online.addEventListener('change', () => this.update({ online: this.online.checked }));
+    // O apelido só vale ao sair do campo ou apertar Enter (não renomeia a cada letra).
+    const commitName = () => this.update({ nickname: cleanName(this.nickname.value) ?? '' });
+    this.nickname.addEventListener('change', commitName);
+    // Teclas digitadas no campo não chegam ao jogo (W, A, S, D, Esc...): o Input escuta a janela.
+    this.nickname.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') this.nickname.blur();
+    });
+    this.nickname.addEventListener('keyup', (e) => e.stopPropagation());
     this.sync();
   }
 
@@ -201,6 +234,12 @@ export class PauseMenu {
     });
   }
 
+  /** Situação da conexão na aba Online. */
+  setOnline(info: MultiplayerInfo): void {
+    this.onlineStatus.textContent =
+      info.status === 'online' ? t('online.status.online', { n: info.players }) : t(`online.status.${info.status}`);
+  }
+
   /** Linhas da aba Carreira (texto pronto). */
   setCareer(lines: string[]): void {
     this.careerInfo.innerHTML = lines.map((l) => `<p>${l}</p>`).join('');
@@ -221,6 +260,8 @@ export class PauseMenu {
     this.showFps.checked = s.showFps;
     this.minimapRotate.checked = s.minimapRotate;
     this.realWorld.checked = s.realWorld;
+    this.online.checked = s.online;
+    if (document.activeElement !== this.nickname) this.nickname.value = s.nickname;
     this.draw.value = String(s.drawDistance);
     this.muted.checked = s.audio.muted;
     for (const input of this.volumeInputs) {

@@ -40,8 +40,47 @@ export const PRACA = {
   plaza: { minX: -125, maxX: 125, minZ: -1300, maxZ: -1026 },
   tribunal: { x: 236, z: -1150, w: 60, d: 84, h: 14 },
   palacio: { x: -236, z: -1150, w: 60, d: 84, h: 14 },
-  garage: { x: 236, z: -1262, w: 16, d: 44, h: 5 }, // aberta para −X (lado da pista); 5 vagas
 };
+
+/**
+ * Garagens do Tribunal: rua de serviço ao longo de X (saindo da pista do Eixo) com GARAGES.count
+ * garagens, metade de cada lado, de frente para a rua. A garagem 0 (a primeira, do lado +Z) é a do jogo
+ * solo; no multiplayer o servidor dá uma a cada jogador da sala (src/net/protocol.ts → ROOM_SIZE).
+ */
+export const GARAGES = {
+  roadZ: -1262,
+  count: 8,
+  /** Centro (X) das primeiras garagens, perto do Eixo, e a distância entre uma e a seguinte. */
+  firstX: 197,
+  spacing: 48,
+  /** Largura (ao longo da rua), profundidade e altura de cada garagem; 5 vagas de 8 m. */
+  w: 44,
+  d: 16,
+  h: 5,
+  /** Da beira da rua até a frente aberta da garagem. */
+  gap: 2,
+};
+
+export interface GarageLayout {
+  index: number;
+  /** Centro em planta. */
+  x: number;
+  z: number;
+  /** +1: garagem do lado +Z da rua (abre para −Z); −1: lado −Z (abre para +Z). */
+  side: 1 | -1;
+}
+
+export function garageLayout(index: number): GarageLayout {
+  const side: 1 | -1 = index % 2 === 0 ? 1 : -1;
+  const x = GARAGES.firstX + Math.floor(index / 2) * GARAGES.spacing;
+  const z = GARAGES.roadZ + side * (6 + GARAGES.gap + GARAGES.d / 2);
+  return { index, x, z, side };
+}
+
+/** Onde a rua de serviço termina (depois da última garagem). */
+export function garageRoadEndX(): number {
+  return garageLayout(GARAGES.count - 1).x + GARAGES.w / 2 + 6;
+}
 
 // Lago Paranoá (a leste) e Lago Sul (península a sudeste).
 export const LAKE = {

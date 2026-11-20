@@ -64,6 +64,8 @@ export class Atmosphere {
   /** Luzes reais do cenário que acendem à noite (ex.: garagem), com a intensidade máxima. */
   private readonly nightLights: { light: THREE.Light; max: number }[] = [];
   private carLights: THREE.MeshStandardMaterial[] = [];
+  private fleetRoots: THREE.Object3D[] = [];
+  private readonly extraRoots = new Set<THREE.Object3D>();
   private readonly dir = new THREE.Vector3();
   private readonly tmpA = new THREE.Color();
   private readonly tmpB = new THREE.Color();
@@ -93,9 +95,24 @@ export class Atmosphere {
     root.add(this.headlight, this.headlight.target);
     this.headlight.position.set(0, 0.35, 2.1);
     this.headlight.target.position.set(0, -0.6, 14);
+    this.fleetRoots = all.map((c) => c.model.root);
+    this.collectCarLights();
+  }
+
+  /** Carros que não são da frota local (jogadores remotos): lanternas também acendem à noite. */
+  addLightRoot(root: THREE.Object3D): void {
+    this.extraRoots.add(root);
+    this.collectCarLights();
+  }
+
+  removeLightRoot(root: THREE.Object3D): void {
+    if (this.extraRoots.delete(root)) this.collectCarLights();
+  }
+
+  private collectCarLights(): void {
     this.carLights = [];
-    for (const c of all)
-      c.model.root.traverse((o) => {
+    for (const root of [...this.fleetRoots, ...this.extraRoots])
+      root.traverse((o) => {
         if (!(o instanceof THREE.Mesh)) return;
         for (const m of [o.material].flat())
           if (m instanceof THREE.MeshStandardMaterial && m.name === 'headlight' && !this.carLights.includes(m)) this.carLights.push(m);
