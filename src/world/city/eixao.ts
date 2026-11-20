@@ -1,11 +1,11 @@
-// Eixão (norte–sul, logo a oeste da Rodoviária) com tesourinhas e superquadras residenciais.
+// Eixão (norte–sul, logo a oeste da Rodoviária) com as tesourinhas. As superquadras 100 ficam em oeste.ts.
 // Tesourinha (versão de jogo): o Eixão sobe numa "lombada-viaduto" sobre a pista local, que passa por
 // baixo; a crista da rampa rende saltos. As alças em trevo são decorativas (no nível do chão).
 import * as THREE from 'three';
 import { t } from '../../core/i18n';
-import { BLOCK_LETTERS, formatAddress, sectorName } from '../../data/addresses';
-import { placeMatrix, rectOf, type CityBuilder } from './builder';
-import { EIXAO, ROAD, SUPERQUADRAS } from './layout';
+import { sectorName } from '../../data/addresses';
+import { rectOf, type CityBuilder } from './builder';
+import { EIXAO, ROAD } from './layout';
 
 export function buildEixao(b: CityBuilder): void {
   const g = b.group('eixao');
@@ -19,7 +19,6 @@ export function buildEixao(b: CityBuilder): void {
   for (const x of EIXAO.tesourinhas) b.navLink(x - half, z, x + half, z, ROAD.main);
 
   EIXAO.tesourinhas.forEach((xc, i) => buildTesourinha(b, g, xc, i + 1));
-  buildSuperquadras(b);
 
   b.landmarks.push({ name: t('place.eixao'), x: -1150, z });
   b.signs.push({ x: 300, z: z - ROAD.main / 2 - 4, yaw: 0, title: 'EPT · Eixão', subtitle: sectorName('EPT') });
@@ -68,40 +67,6 @@ function buildTesourinha(b: CityBuilder, g: THREE.Object3D, xc: number, n: numbe
   }
 
   b.signs.push({ x: xc + ROAD.local / 2 + 4, z: z + w / 2 + 40, yaw: Math.PI, title: `EPT · ${t('addr.trecho', { v: n })}`, subtitle: sectorName('EPT') });
-}
-
-/** Blocos de 6 andares sobre pilotis, 8 por quadra, ao redor de um centro livre. */
-function buildSuperquadras(b: CityBuilder): void {
-  const g = b.group('superquadras');
-  const m = b.mats;
-  const size = { w: 75, h: 20, d: 13 };
-  const geo = new THREE.BoxGeometry(size.w, size.h, size.d);
-  // +X, −X (empenas), +Y, −Y, +Z, −Z (fachadas com janelas).
-  const material = [m.concrete, m.concrete, m.roof, m.roof, m.blockFacade, m.blockFacade];
-  const matrices: THREE.Matrix4[] = [];
-  const slots: [number, number, boolean][] = [
-    [-120, -120, false], [0, -120, false], [120, -120, false],
-    [-120, 0, true], [120, 0, true],
-    [-120, 120, false], [0, 120, false], [120, 120, false],
-  ];
-  for (const cx of SUPERQUADRAS.centersX) {
-    const wing = cx < 0 ? 'N' : 'S';
-    const number = 100 + (SUPERQUADRAS.centersX.filter((x) => Math.sign(x) === Math.sign(cx) && Math.abs(x) <= Math.abs(cx)).length * 4);
-    const cz = SUPERQUADRAS.centerZ;
-    slots.forEach(([dx, dz, alongZ], i) => {
-      const x = cx + dx;
-      const z = cz + dz;
-      matrices.push(placeMatrix(x, size.h / 2, z, alongZ ? Math.PI / 2 : 0));
-      b.occupy(alongZ ? rectOf(x, z, size.d, size.w, 4) : rectOf(x, z, size.w, size.d, 4));
-      // Endereço na fachada voltada para o centro da quadra.
-      const ax = alongZ ? x - Math.sign(dx) * 12 : x;
-      const az = alongZ ? z : z - Math.sign(dz) * 12;
-      b.address(`sqb-${wing}${number}-${BLOCK_LETTERS[i]}`, formatAddress('SQB', [{ kind: 'raw', v: String(number) }, { kind: 'bloco', v: BLOCK_LETTERS[i] }], wing), ax, az);
-    });
-    b.signs.push({ x: cx - SUPERQUADRAS.size / 2 + 10, z: cz - SUPERQUADRAS.size / 2 - 6, yaw: Math.PI, title: `SQB-${wing} ${number}`, subtitle: sectorName('SQB') });
-  }
-  b.instanced(g, geo, material, matrices, undefined, 'blocos-residenciais');
-  b.landmarks.push({ name: t('place.superquadras'), x: SUPERQUADRAS.centersX[2], z: SUPERQUADRAS.centerZ });
 }
 
 function half(h: { run: number; deck: number }): number {

@@ -304,7 +304,7 @@ export class Game {
       // O navegador solta o pointer lock ao apertar Esc: tratamos como pausa.
       if (!locked && !this.paused && !this.modal) this.setPaused(true);
     };
-    this.cameraRig = new CameraRig(this.camera, cfg, () => this.world.cameraColliders);
+    this.cameraRig = new CameraRig(this.camera, cfg, (o, d, far) => this.world.cameraCandidates(o, d, far));
     this.cameraRig.yaw = level.spawnYaw + Math.PI; // começa atrás do jogador
 
     this.hud = new Hud(

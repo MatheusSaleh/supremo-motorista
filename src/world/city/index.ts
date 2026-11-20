@@ -2,18 +2,24 @@
 // das malhas. Para trocar por um .glb do OpenStreetMap (Blosm), use levelFromGLTF() e não mexa no resto.
 import type { GarageSlot, Level } from '../Level';
 import { buildAeroporto } from './aeroporto';
+import { buildAsas } from './asas';
+import { buildCentro } from './centro';
+import { buildOeste } from './oeste';
 import { CityBuilder, type Rect } from './builder';
 import { buildEixao } from './eixao';
 import { buildEsplanada } from './esplanada';
 import { buildLago, lakeWater } from './lago';
-import { BOUNDS, EIXO, LAKE, garageLayout } from './layout';
+import { BOUNDS, EIXO, LAKE, OPEN_ON_PURPOSE, garageLayout } from './layout';
 import { lawnMaterial } from './materials';
 import { buildMarcos } from './marcos';
 import { buildPonte } from './ponte';
 import { buildPraca, garageSpawns } from './praca';
 import { buildBounds, buildFactionFlags, buildSigns, buildStreetLights, buildTrees } from './props';
 import { drapeOnTerrain } from './drape';
+import { tintGround } from './ground';
+import { CityKit } from './quadras';
 import { createTerrain } from './terrain';
+import { measureOccupancy } from './occupancy';
 
 export function createCity(seed = 1960): Level {
   const b = new CityBuilder(seed);
@@ -43,16 +49,32 @@ export function createCity(seed = 1960): Level {
   buildMarcos(b);
   buildPonte(b);
 
+  // Cidade densa (docs/PLANO-MAPA.md): as regiões novas usam o kit de quadras/lotes.
+  const kit = new CityKit(b);
+  buildAsas(b, kit);
+  buildCentro(b, kit);
+  buildOeste(b, kit);
+  kit.flush();
+
   buildSigns(b);
   buildStreetLights(b);
   buildFactionFlags(b);
   buildTrees(b, land, 2600);
   buildBounds(b, BOUNDS);
 
+  // Diagnóstico (só em dev): quanto da terra firme ainda é gramado vazio. Ver docs/PLANO-MAPA.md.
+  if (import.meta.env.DEV) {
+    const lawn = { minX: -EIXO.lawnHalfWidth, maxX: EIXO.lawnHalfWidth, minZ: EIXO.walkStartZ, maxZ: EIXO.walkEndZ };
+    const report = measureOccupancy(b.root, BOUNDS, land, [lawn, ...OPEN_ON_PURPOSE]);
+    b.root.userData.occupancy = report;
+    console.info(`[cidade] gramado vazio: ${(report.emptyFraction * 100).toFixed(1)}% da terra firme; maior mancha ${report.largestEmptyKm2.toFixed(2)} km²`);
+  }
+
   // Relevo real (ver terrain.ts): a cidade foi gerada no plano e agora acompanha o terreno.
   const terrain = createTerrain();
   const heightAt = (x: number, z: number) => terrain.heightAt(x, z);
   drapeOnTerrain(b.root, heightAt);
+  tintGround(b.root);
   if (import.meta.env.DEV) console.info(`[cidade] relevo: escala vertical ${terrain.verticalScale.toFixed(2)}, Praça ${heightAt(0, -1150).toFixed(1)} m, Rodoviária ${heightAt(0, 960).toFixed(1)} m, Torre ${heightAt(0, 1620).toFixed(1)} m`);
 
   b.root.updateMatrixWorld(true);

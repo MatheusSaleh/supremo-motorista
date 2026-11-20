@@ -2,6 +2,7 @@
 // minimapa; nunca em corridas, manchetes ou piadas — ver regras de conteúdo). O banco é fictício.
 // Cada prédio busca a silhueta reconhecível, não a planta exata.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { t } from '../../core/i18n';
 import { formatAddress, sectorName } from '../../data/addresses';
 import { placeMatrix, rectOf, type CityBuilder } from './builder';
@@ -212,15 +213,151 @@ function buildMuseuBiblioteca(b: CityBuilder): void {
   b.address('biblioteca', formatAddress('SCR', [{ kind: 'lote', v: 3 }]), bi.x + bi.w / 2 + 8, bi.z);
 }
 
-/** Superintendência da PF: caixa de vidro preto (a "máscara negra") sobre embasamento. */
+/**
+ * Sede da Polícia Federal (SAIS): duas torres de ~18 andares, cada uma uma pilha de volumes facetados
+ * (cantos chanfrados) deslocados e levemente girados entre si; na da direita, um volume em balanço no meio.
+ * Fachada em faixas horizontais: peitoris brancos e vidros escuros, cinza e prateados em mosaico.
+ * Na frente, muro baixo, letreiro de pedra escura e uma fileira de palmeiras. A frente fica em +Z (L2).
+ */
 function buildPf(b: CityBuilder): void {
   const s = MARCOS.pf;
   const g = b.group('pf');
-  b.box(g, s.w + 10, 3, s.d + 10, b.mats.concrete, s.x, 1.5, s.z);
-  b.box(g, s.w, s.h, s.d, glass(0x4d5560, s.w / 3, s.h / 3.5, 0.3), s.x, 3 + s.h / 2, s.z, 'pf');
+  g.userData.drape = 'rigid'; // as torres sobem inteiras (não entortam com o relevo)
+  const floor = 3.6;
+  const facade = pfFacadeMaterial(floor);
+  const roof = new THREE.MeshStandardMaterial({ color: 0x3a3e44, roughness: 0.8 });
+
+  b.slab(g, rectOf(s.x, s.z, s.w + 16, s.d + 10), 0.4, b.mats.plaza);
+  /** Volume facetado: [w, d, chanfro, andar inicial, andares, dx, dz, giro]. */
+  type Vol = [number, number, number, number, number, number, number, number];
+  const towers: { cx: number; vols: Vol[] }[] = [
+    {
+      cx: s.x - 30,
+      vols: [
+        [50, 36, 8, 0, 5, -6, 5, 0], // embasamento largo
+        [34, 31, 7, 0, 18, 3, -3, 0.07], // corpo principal
+        [24, 29, 6, 8, 7, -16, -2, -0.06], // volume lateral, recuado no alto
+      ],
+    },
+    {
+      cx: s.x + 30,
+      vols: [
+        [34, 31, 7, 0, 19, -5, -5, -0.06], // corpo principal
+        [46, 34, 8, 0, 5, 2, 5, 0], // embasamento
+        [31, 33, 8, 6, 8, 11, 3, 0.1], // balanço no meio da torre
+      ],
+    },
+  ];
+  for (const t of towers) {
+    let top = 0;
+    for (const [w, d, ch, f0, n, dx, dz, rot] of t.vols) {
+      const h = n * floor;
+      const m = new THREE.Mesh(chamferedPrism(w, d, ch, h), [roof, facade]);
+      m.position.set(t.cx + dx, 0.4 + f0 * floor, s.z + dz);
+      m.rotation.y = rot;
+      m.castShadow = m.receiveShadow = true;
+      m.userData.collider = 'convex';
+      g.add(m);
+      if (f0 + n > top) top = f0 + n;
+    }
+    // Casa de máquinas escura no topo do corpo principal.
+    const main = t.vols[0][4] > t.vols[1][4] ? t.vols[0] : t.vols[1];
+    const cap = b.box(g, main[0] - 10, 3, main[1] - 10, roof, t.cx + main[5], 0.4 + top * floor + 1.5, s.z + main[6]);
+    cap.rotation.y = main[7];
+  }
+
+  // Muro baixo na frente, com o letreiro em pedra escura.
+  const front = s.z + s.d / 2 + 4;
+  b.box(g, s.w - 10, 1.2, 0.5, b.mats.white, s.x, 1, front);
+  b.box(g, 12, 2.6, 1.6, roof, s.x - 4, 1.7, front + 3);
+  b.letreiro(g, t('place.pf'), s.x - 4, 1.8, front + 3.82, 0, 11, 1.1, { bg: '#2b2e33', fg: '#e8e4da' });
+
+  // Palmeiras: tronco (colide como poste) e copa de folhas em leque.
+  const palms: THREE.Matrix4[] = [];
+  for (let x = s.x - s.w / 2; x <= s.x + s.w / 2; x += 10) palms.push(placeMatrix(x + (b.rng() - 0.5) * 2, 0.4, front - 3 + (b.rng() - 0.5) * 1.5, b.rng() * Math.PI * 2, 1.15 + b.rng() * 0.3));
+  const trunks = b.instanced(g, new THREE.CylinderGeometry(0.2, 0.3, 8, 6).translate(0, 4, 0), new THREE.MeshStandardMaterial({ color: 0x7b6a55, roughness: 1 }), palms, undefined, 'palmeiras-troncos');
+  trunks.userData.collider = 'pole';
+  trunks.userData.poleRadius = 0.3;
+  trunks.userData.cameraIgnore = true;
+  const fronds = b.instanced(g, palmCrownGeometry(), new THREE.MeshStandardMaterial({ color: 0x3f7a35, roughness: 0.9, side: THREE.DoubleSide }), palms, undefined, 'palmeiras-copas');
+  fronds.userData.noCollision = true;
+
   b.occupy(rectOf(s.x, s.z, s.w + 10, s.d + 10, 4));
   b.landmarks.push({ name: t('place.pf'), x: s.x, z: s.z });
-  b.address('pf', formatAddress('SAA', [{ kind: 'quadra', v: 7 }, { kind: 'lote', v: 23 }]), s.x, s.z - s.d / 2 - 12);
+  b.address('pf', formatAddress('SAA', [{ kind: 'quadra', v: 7 }, { kind: 'lote', v: 23 }]), s.x, s.z + s.d / 2 + 14);
+}
+
+/** Prisma vertical de planta retangular com os cantos chanfrados (octógono alongado), base em y = 0. */
+function chamferedPrism(w: number, d: number, ch: number, h: number): THREE.BufferGeometry {
+  const x = w / 2;
+  const z = d / 2;
+  const shape = new THREE.Shape([
+    new THREE.Vector2(-x + ch, -z),
+    new THREE.Vector2(x - ch, -z),
+    new THREE.Vector2(x, -z + ch),
+    new THREE.Vector2(x, z - ch),
+    new THREE.Vector2(x - ch, z),
+    new THREE.Vector2(-x + ch, z),
+    new THREE.Vector2(-x, z - ch),
+    new THREE.Vector2(-x, -z + ch),
+  ]);
+  // Extrude em Z (UV das laterais: u = metros ao longo da parede, v = metros de altura) e deita em Y.
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false });
+  geo.rotateX(-Math.PI / 2);
+  return geo;
+}
+
+/** Fachada da PF: cada faixa é um andar (peitoril branco + vidro); o vidro alterna escuro/cinza/prata. */
+function pfFacadeMaterial(floor: number): THREE.MeshStandardMaterial {
+  const rng = createRng(77);
+  const W = 512;
+  const floors = 6;
+  const H = 64 * floors;
+  const tex = canvasTexture(W, H, (ctx) => {
+    const dark = ['#2c343c', '#3a434c', '#4d5761'];
+    const light = ['#8ea3b6', '#b4c6d6', '#d0dde7', '#6d7a87'];
+    for (let f = 0; f < floors; f++) {
+      const y = f * 64;
+      ctx.fillStyle = '#eef0f0';
+      ctx.fillRect(0, y, W, 12); // peitoril branco (a faixa que marca cada andar)
+      // Cada andar tem um tom dominante (escuro ou prateado) com trechos longos do outro tom.
+      const base = rng() < 0.5 ? dark : light;
+      const other = base === dark ? light : dark;
+      let x = 0;
+      while (x < W) {
+        const run = 32 * (2 + Math.floor(rng() * 6));
+        const pal = rng() < 0.7 ? base : other;
+        const c = pal[Math.floor(rng() * pal.length)];
+        ctx.fillStyle = c;
+        ctx.fillRect(x, y + 12, run, 52);
+        ctx.fillStyle = 'rgba(0,0,0,0.18)';
+        ctx.fillRect(x, y + 44, run, 20); // metade de baixo do vidro, mais escura
+        x += run;
+      }
+      ctx.fillStyle = 'rgba(220,224,226,0.18)';
+      for (let k = 0; k < W; k += 32) ctx.fillRect(k, y + 12, 1, 52);
+    }
+  });
+  // 1 textura = 24 m × 6 andares (UV das laterais em metros).
+  tex.repeat.set(1 / 24, 1 / (floors * floor));
+  const m = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.25, metalness: 0.35 });
+  m.emissive.set(0xffd9a0);
+  m.emissiveMap = tex;
+  m.emissiveIntensity = 0;
+  m.userData.nightGlow = 0.25;
+  return m;
+}
+
+/** Copa de palmeira: folhas em leque (planos finos inclinados para baixo) no alto de um tronco de 8 m. */
+export function palmCrownGeometry(): THREE.BufferGeometry {
+  const leaves: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 7; i++) {
+    const leaf = new THREE.PlaneGeometry(0.9, 3.6).translate(0, 1.8, 0);
+    leaf.rotateX(-1.1 + (i % 2) * 0.25); // abre e cai para fora
+    leaf.rotateY((i / 7) * Math.PI * 2);
+    leaves.push(leaf.translate(0, 7.8, 0));
+  }
+  return mergeGeometries(leaves);
 }
 
 /** Teatro Nacional: pirâmide truncada (tronco de base retangular). */

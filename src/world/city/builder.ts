@@ -63,6 +63,8 @@ export class CityBuilder {
   readonly landmarks: Landmark[] = [];
   readonly addresses: AddressPoint[] = [];
   readonly signs: SignSpec[] = [];
+  /** Árvores em posições escolhidas (cinturões das quadras, alamedas); plantadas antes dos bosques. */
+  readonly treeSpots: { x: number; z: number; s: number }[] = [];
 
   constructor(seed: number) {
     this.rng = createRng(seed);
@@ -82,6 +84,11 @@ export class CityBuilder {
 
   isFree(x: number, z: number): boolean {
     return !this.occupied.some((r) => inRect(r, x, z));
+  }
+
+  /** O retângulo não encosta em nada já ocupado (prédios, pistas com margem, praças…). */
+  isRectFree(r: Rect): boolean {
+    return !this.occupied.some((o) => o.minX < r.maxX && o.maxX > r.minX && o.minZ < r.maxZ && o.maxZ > r.minZ);
   }
 
   address(id: string, label: string, x: number, z: number): void {

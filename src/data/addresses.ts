@@ -2,7 +2,7 @@
 // Os nomes por extenso ficam no dicionário de i18n (chaves sector.*); aqui só a estrutura.
 import { t, type StringKey } from '../core/i18n';
 
-export type SectorId = 'SPTP' | 'EMB' | 'SRF' | 'EPT' | 'SQB' | 'SRL' | 'SHIP' | 'SAE' | 'SAA' | 'SBC' | 'SCR' | 'SMB';
+export type SectorId = 'SPTP' | 'EMB' | 'SRF' | 'EPT' | 'SQB' | 'SRL' | 'SHIP' | 'SAE' | 'SAA' | 'SBC' | 'SCR' | 'SMB' | 'CLQ' | 'SGA' | 'SCC' | 'SHT' | 'SDV' | 'SHG';
 
 export const SECTORS: Record<SectorId, { sigla: string; nameKey: StringKey }> = {
   SPTP: { sigla: 'SPTP', nameKey: 'sector.SPTP' },
@@ -17,6 +17,12 @@ export const SECTORS: Record<SectorId, { sigla: string; nameKey: StringKey }> = 
   SBC: { sigla: 'SBC', nameKey: 'sector.SBC' },
   SCR: { sigla: 'SCR', nameKey: 'sector.SCR' },
   SMB: { sigla: 'SMB', nameKey: 'sector.SMB' },
+  CLQ: { sigla: 'CLQ', nameKey: 'sector.CLQ' },
+  SGA: { sigla: 'SGA', nameKey: 'sector.SGA' },
+  SCC: { sigla: 'SCC', nameKey: 'sector.SCC' },
+  SHT: { sigla: 'SHT', nameKey: 'sector.SHT' },
+  SDV: { sigla: 'SDV', nameKey: 'sector.SDV' },
+  SHG: { sigla: 'SHG', nameKey: 'sector.SHG' },
 };
 
 /** Partes de um endereço (cada uma vira "Bloco C", "Casa 12"…, traduzidas via i18n). */
@@ -60,3 +66,6 @@ export const RESTAURANT_KEYS: StringKey[] = [
   'restaurant.4',
   'restaurant.5',
 ];
+
+/** Lojas fictícias do comércio local das quadras (chaves de i18n). */
+export const SHOP_KEYS = Array.from({ length: 16 }, (_, i) => `shop.${i + 1}` as StringKey);

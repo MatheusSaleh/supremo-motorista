@@ -34,7 +34,7 @@ export class CameraRig {
     readonly camera: THREE.PerspectiveCamera,
     private readonly cfg: Config,
     /** Malhas contra as quais a câmera colide (devem ter BVH). */
-    private readonly colliders: () => readonly THREE.Object3D[],
+    private readonly colliders: (origin: THREE.Vector3, dir: THREE.Vector3, far: number) => readonly THREE.Object3D[],
   ) {
     this.pitch = cfg.camera.pitch;
     this.distance = cfg.camera.distance;
@@ -131,7 +131,7 @@ export class CameraRig {
     let allowed = distance;
     this.raycaster.set(this.smoothTarget, this.dir);
     this.raycaster.far = distance + c.collisionPadding;
-    const hit = this.raycaster.intersectObjects(this.colliders() as THREE.Object3D[], false)[0];
+    const hit = this.raycaster.intersectObjects(this.colliders(this.smoothTarget, this.dir, this.raycaster.far) as THREE.Object3D[], false)[0];
     if (hit) allowed = Math.max(c.minDistance * 0.25, hit.distance - c.collisionPadding);
 
     if (allowed < this.currentDistance) this.currentDistance = allowed;

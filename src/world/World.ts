@@ -7,6 +7,7 @@
 //   cameraIgnore: true → tem colisor, mas a câmera atravessa (ex.: troncos finos)
 //   collider: 'convex' → usa casco convexo em vez de trimesh (mais barato e robusto)
 //   collider: 'pole'   → cilindro vertical fino (postes, troncos); raio em userData.poleRadius
+//   collider: 'box'    → cuboide da caixa envolvente da geometria (peças compostas pequenas, ex.: carros parados)
 //   surface: 'grass' | 'asphalt' | 'wood' | 'concrete' → tipo de piso (som dos passos, aderência)
 //   breakKind + breakIds (InstancedMesh) / breakId (malha) → prop quebrável (ver Breakables)
 //   cullDistance: m → some além dessa distância × qualidade (distância de desenho)
@@ -16,6 +17,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { Config } from '../config';
 import { Breakables, type PropKind } from './Breakables';
 import type { Level } from './Level';
+import { MeshGrid } from './MeshGrid';
 
 export class World {
   readonly scene = new THREE.Scene();
@@ -24,6 +26,9 @@ export class World {
   /** Malhas consultadas por surfaceAt (colisores + pistas, que são só visuais). */
   private readonly surfaceMeshes: THREE.Mesh[] = [];
   private readonly surfaceRay = new THREE.Raycaster();
+  /** Grades espaciais para os raycasts curtos de câmera e de piso (ver MeshGrid). */
+  private readonly cameraGrid = new MeshGrid();
+  private readonly surfaceGrid = new MeshGrid();
   private shadowRange: number;
   private drawDistance = 1;
   private readonly detail: { obj: THREE.Object3D; center: THREE.Vector3; radius: number; distance: number }[] = [];
@@ -107,7 +112,11 @@ export class World {
         this.cameraColliders.push(obj);
       }
     });
-    this.surfaceMeshes.push(...this.cameraColliders);
+    // Piso: instâncias (prédios, pilares, carros parados) não são chão, e o raycast do three percorre cada
+    // instância de cada bloco: com milhares delas, uma consulta custava milissegundos.
+    this.surfaceMeshes.push(...this.cameraColliders.filter((m) => !(m instanceof THREE.InstancedMesh)));
+    for (const m of this.cameraColliders) this.cameraGrid.add(m);
+    for (const m of this.surfaceMeshes) this.surfaceGrid.add(m);
     this.surfaceRay.firstHitOnly = true;
     this.batchStatic(root);
     // Cenário estático: não recalcula matrizes a cada frame.
@@ -124,8 +133,13 @@ export class World {
   surfaceAt(p: THREE.Vector3Like): string {
     this.surfaceRay.set(new THREE.Vector3(p.x, p.y + 0.6, p.z), new THREE.Vector3(0, -1, 0));
     this.surfaceRay.far = 2;
-    const hit = this.surfaceRay.intersectObjects(this.surfaceMeshes, false)[0];
+    const hit = this.surfaceRay.intersectObjects(this.surfaceGrid.candidates(this.surfaceRay.ray.origin, this.surfaceRay.ray.direction, 2), false)[0];
     return (hit?.object.userData.surface as string | undefined) ?? 'concrete';
+  }
+
+  /** Malhas do cenário que um raio curto (câmera) pode atingir: só as das células que ele cruza. */
+  cameraCandidates(origin: THREE.Vector3Like, dir: THREE.Vector3Like, far: number): THREE.Mesh[] {
+    return this.cameraGrid.candidates(origin, dir, far);
   }
 
   /** Mantém a área de sombra e o céu centrados no jogador/câmera. */
@@ -235,6 +249,18 @@ export class World {
     }
     let desc: RAPIER.ColliderDesc | null;
 
+    if (mesh.userData.collider === 'box') {
+      if (!geom.boundingBox) geom.computeBoundingBox();
+      const bb = geom.boundingBox!;
+      const pos = new THREE.Vector3();
+      const quat = new THREE.Quaternion();
+      const scale = new THREE.Vector3();
+      matrix.decompose(pos, quat, scale);
+      const c = bb.getCenter(new THREE.Vector3()).multiply(scale).applyQuaternion(quat).add(pos);
+      const h = bb.getSize(new THREE.Vector3()).multiply(scale).multiplyScalar(0.5);
+      this.physics.createCollider(RAPIER.ColliderDesc.cuboid(Math.abs(h.x), Math.abs(h.y), Math.abs(h.z)).setTranslation(c.x, c.y, c.z).setRotation(quat));
+      return;
+    }
     if (geom instanceof THREE.BoxGeometry) {
       this.createBoxColliders(geom, matrix);
       return;
@@ -277,7 +303,9 @@ export class World {
       const mat = o.material;
       if (Array.isArray(mat) || mat.transparent || !o.visible || o.userData.noBatch || o.userData.breakKind) return;
       box.setFromObject(o).getCenter(center);
-      const key = `${mat.uuid}|${o.castShadow}|${o.receiveShadow}|${Math.floor(center.x / CELL)},${Math.floor(center.z / CELL)}`;
+      // Malhas com distância de desenho só se juntam a outras com a mesma distância (o lote herda o corte).
+      const cull = typeof o.userData.cullDistance === 'number' ? o.userData.cullDistance : '';
+      const key = `${mat.uuid}|${o.castShadow}|${o.receiveShadow}|${cull}|${Math.floor(center.x / CELL)},${Math.floor(center.z / CELL)}`;
       let list = groups.get(key);
       if (!list) groups.set(key, (list = []));
       list.push(o);
@@ -286,6 +314,7 @@ export class World {
     const batched = new THREE.Group();
     batched.name = 'lotes-estaticos';
     let merged = 0;
+    const absorbed = new Set<THREE.Object3D>();
     for (const list of groups.values()) {
       if (list.length < 2) continue;
       const geos = list.map((m) => {
@@ -305,6 +334,19 @@ export class World {
       batched.add(mesh);
       list.forEach((m) => (m.visible = false));
       merged += list.length;
+      const cull = list[0].userData.cullDistance;
+      if (typeof cull === 'number') {
+        // As originais saem da lista de detalhes (senão o corte por distância as reacenderia).
+        list.forEach((m) => absorbed.add(m));
+        geo.computeBoundingSphere();
+        const sphere = geo.boundingSphere!;
+        this.detail.push({ obj: mesh, center: sphere.center.clone(), radius: sphere.radius, distance: cull });
+      }
+    }
+    if (absorbed.size) {
+      const kept = this.detail.filter((d) => !absorbed.has(d.obj));
+      this.detail.length = 0;
+      this.detail.push(...kept);
     }
     root.add(batched);
     batched.updateMatrixWorld(true);

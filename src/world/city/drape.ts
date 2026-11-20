@@ -3,7 +3,8 @@
 //    terreno sob eles (ficam nivelados e sem vão por baixo);
 //  - malhas grandes (chão, pistas, calçadões, ministérios, muretas) são subdivididas e cada vértice
 //    acompanha o terreno;
-//  - instâncias (árvores, postes) sobem cada uma pela altura do seu ponto.
+//  - instâncias (árvores, postes) sobem cada uma pela altura do seu ponto;
+//  - userData.drape = 'rigid' faz um grupo grande subir inteiro (torres que não podem entortar).
 // Malhas deformadas deixam de ser BoxGeometry, então o World gera trimesh para elas.
 // userData.noDrape = true deixa um objeto (e seus filhos) como está (água, fundo do lago).
 import * as THREE from 'three';
@@ -49,7 +50,7 @@ export function drapeOnTerrain(root: THREE.Object3D, heightAt: HeightFn): void {
     if (obj !== root && hasMesh(obj)) {
       box.setFromObject(obj);
       const size = Math.max(box.max.x - box.min.x, box.max.z - box.min.z);
-      if (size <= RIGID_SIZE && !(obj instanceof THREE.Mesh && obj.userData.drape === 'deform')) {
+      if ((size <= RIGID_SIZE || obj.userData.drape === 'rigid') && !(obj instanceof THREE.Mesh && obj.userData.drape === 'deform')) {
         const dy = Math.min(
           heightAt(box.min.x, box.min.z),
           heightAt(box.max.x, box.min.z),

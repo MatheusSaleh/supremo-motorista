@@ -3,6 +3,7 @@
 import GUI from 'lil-gui';
 import Stats from 'stats.js';
 import type { Game } from './Game';
+import { drawOccupancy, type OccupancyReport } from '../world/city/occupancy';
 
 export function setupDevTools(game: Game): () => void {
   const cfg = game.cfg;
@@ -85,6 +86,26 @@ export function setupDevTools(game: Game): () => void {
   ca.add({ unlock: () => { for (const id of ['equinocio', 'sw4', 'lexo']) game.career.cars.add(id); } }, 'unlock').name('liberar todos os carros');
   ca.add({ save: () => game.saveCareer() }, 'save').name('salvar agora');
   ca.close();
+
+  // Mapa (plano de densificação): grade de ocupação. Vermelho = gramado vazio (a mais de 60 m de tudo).
+  const occ = level?.root.userData.occupancy as OccupancyReport | undefined;
+  if (occ) {
+    const mp = gui.addFolder('Mapa');
+    let overlay: HTMLCanvasElement | null = null;
+    const toggle = () => {
+      if (overlay) {
+        overlay.remove();
+        overlay = null;
+        return;
+      }
+      overlay = drawOccupancy(occ);
+      overlay.id = 'mapa-ocupacao';
+      overlay.style.cssText = 'position:fixed;left:8px;top:56px;z-index:101;height:min(85vh,1000px);image-rendering:pixelated;border:2px solid #000;';
+      document.body.appendChild(overlay);
+    };
+    mp.add({ toggle }, 'toggle').name(`vazios (${(occ.emptyFraction * 100).toFixed(1)}%)`);
+    mp.close();
+  }
 
   const a = gui.addFolder('Animação');
   a.add(game.localPlayer.avatar, 'showCollider').name('mostrar colisor');

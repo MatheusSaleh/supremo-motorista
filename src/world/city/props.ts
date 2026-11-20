@@ -72,10 +72,13 @@ export function buildTrees(b: CityBuilder, land: Rect[], count: number): void {
     return true;
   };
 
+  for (const t of b.treeSpots) tryAdd(t.x, t.z, t.s);
+  const goal = pos.length + count; // os bosques vêm além das árvores plantadas
+
   // Bosques: escolhe um centro e espalha um punhado de árvores ao redor (parece mais natural).
   const area = land.map((r) => (r.maxX - r.minX) * (r.maxZ - r.minZ));
   const total = area.reduce((a, c) => a + c, 0);
-  for (let tries = 0; tries < count * 3 && pos.length < count; tries++) {
+  for (let tries = 0; tries < count * 3 && pos.length < goal; tries++) {
     let pick = b.rng() * total;
     let r = land[0];
     for (let i = 0; i < land.length; i++) {
@@ -95,7 +98,7 @@ export function buildTrees(b: CityBuilder, land: Rect[], count: number): void {
     }
   }
 
-  const trunkGeo = new THREE.CylinderGeometry(0.18, 0.28, 3, 6).translate(0, 1.5, 0);
+  const trunkGeo = new THREE.CylinderGeometry(0.18, 0.28, 3, 6, 1, true).translate(0, 1.5, 0); // sem tampas (não aparecem)
   const crownGeo = new THREE.IcosahedronGeometry(2, 0).translate(0, 4.2, 0);
   const matrices = pos.map((p) => placeMatrix(p.x, 0, p.z, b.rng() * Math.PI * 2, p.s));
   const colors = pos.map(() => new THREE.Color().setHSL(0.24 + b.rng() * 0.08, 0.45 + b.rng() * 0.2, 0.28 + b.rng() * 0.1));

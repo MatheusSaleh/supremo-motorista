@@ -5,6 +5,10 @@ import * as THREE from 'three';
 import type { Assets } from '../core/Assets';
 import type { Grips } from '../player/SeatedDriver';
 import { createCarInterior } from './carInterior';
+import { mergeByMaterial } from './mergeParts';
+
+/** Distância (m) da câmera até o carro abaixo da qual o interior é desenhado (pelo vidro não se vê de longe). */
+const INTERIOR_NEAR = 14;
 
 export interface CarModel {
   root: THREE.Group;
@@ -150,6 +154,7 @@ export function createCarModelFromAsset(asset: CarAsset, paintColor: number | nu
   WHEEL_ORDER.forEach((name, i) => {
     const wheel = adopt(part(name)!, false);
     wheel.position.set(0, 0, 0); // a origem do nó é o cubo da roda (garantido na conversão)
+    mergeByMaterial(wheel); // aro, pneu, raios… viram poucas malhas (a roda gira inteira)
     const steer = new THREE.Group(); // posicionado pelo Car (suspensão) e girado em Y (esterço)
     const spin = new THREE.Group(); // gira em X (rolagem)
     spin.add(wheel);
@@ -163,6 +168,8 @@ export function createCarModelFromAsset(asset: CarAsset, paintColor: number | nu
   if (!bodySrc) throw new Error('carro sem lataria');
   const body = adopt(bodySrc, true);
   bodySrc.matrixWorld.decompose(body.position, body.quaternion, body.scale);
+  // A lataria é estática (os amassados mexem nos vértices): uma malha por material em vez de ~90 peças.
+  mergeByMaterial(body);
   bodyGroup.add(body);
   const bodyMeshes: THREE.Mesh[] = [];
   body.traverse((o) => {
@@ -187,6 +194,7 @@ export function createCarModelFromAsset(asset: CarAsset, paintColor: number | nu
   interior.root.scale.copy(asset.geometry.interiorScale);
   // Modelo com interior próprio: esconde bancos/painel procedurais (âncoras, pegadas e olhos continuam).
   if (modelInterior) interior.root.traverse((o) => { if (o instanceof THREE.Mesh) o.visible = false; });
+  interior.root.traverse((o) => { if (o instanceof THREE.Mesh) o.castShadow = false; }); // fica dentro da lataria
   bodyGroup.add(interior.root);
   // Motorista e passageiro ficam em âncoras SEM escala (personagem não pode ser deformado).
   const anchor = (src: THREE.Object3D) => {
@@ -241,6 +249,20 @@ export function createCarModelFromAsset(asset: CarAsset, paintColor: number | nu
     bb.union(m.geometry.boundingBox!);
   }
   const center = bb.getCenter(new THREE.Vector3());
+
+  // Interior só de perto: a cada quadro em que a lataria é desenhada, decide se o interior entra no próximo.
+  const camPos = new THREE.Vector3();
+  const carPos = new THREE.Vector3();
+  // Vigia: a maior malha da lataria (a pintura), que está no quadro sempre que o carro está.
+  const watcher = bodyMeshes.reduce<THREE.Mesh | null>((best, m) => (!best || m.geometry.attributes.position.count > best.geometry.attributes.position.count ? m : best), null);
+  interior.root.visible = false;
+  if (watcher) {
+    watcher.onBeforeRender = (_r, _s, camera) => {
+      camera.getWorldPosition(camPos);
+      body.getWorldPosition(carPos);
+      interior.root.visible = camPos.distanceToSquared(carPos) < INTERIOR_NEAR * INTERIOR_NEAR;
+    };
+  }
   const half = bb.getSize(new THREE.Vector3()).multiplyScalar(0.5);
   const v = new THREE.Vector3();
   const o = new THREE.Vector3();
