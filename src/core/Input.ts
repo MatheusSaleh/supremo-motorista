@@ -1,6 +1,12 @@
 // Estado de teclado e mouse. Usa KeyboardEvent.code (posição física) para WASD funcionar em qualquer layout.
 // Mouse: pointer lock ao clicar no canvas; sem lock, arrastar com o botão pressionado também gira a câmera.
 
+/** Movimento (px) a partir do qual um evento pode ser um pico espúrio... */
+const SPIKE_MIN = 120;
+/** ...se for mais que SPIKE_RATIO vezes o evento anterior (+ folga, para partidas do repouso). */
+const SPIKE_RATIO = 6;
+const SPIKE_SLACK = 12;
+
 export class Input {
   private readonly down = new Set<string>();
   private readonly pressed = new Set<string>();
@@ -9,6 +15,11 @@ export class Input {
   private wheel = 0;
   private dragging = false;
   private _pointerLocked = false;
+  /** Filtro de picos do mouse: tamanho do último movimento aceito e descarte do primeiro evento. */
+  private lastMoveMag = 0;
+  private skipNextMove = false;
+  /** O navegador suporta movimento bruto (sem aceleração do sistema) no pointer lock. */
+  private rawMovement = true;
   private readonly abort = new AbortController();
   /** Chamado quando o pointer lock é obtido/perdido (ex.: o navegador o solta ao apertar Esc). */
   onPointerLockChange?: (locked: boolean) => void;
@@ -34,14 +45,29 @@ export class Input {
 
     element.addEventListener('mousedown', () => {
       if (!this.enabled) return;
+      if (!this.dragging) this.resetMoveFilter();
       this.dragging = true;
       if (this.usePointerLock && !this._pointerLocked) this.requestPointerLock();
     }, opts);
     window.addEventListener('mouseup', () => (this.dragging = false), opts);
     document.addEventListener('mousemove', (e) => {
       if (!this.enabled || (!this._pointerLocked && !this.dragging)) return;
-      this.mouseDX += e.movementX;
-      this.mouseDY += e.movementY;
+      // Primeiro evento depois de capturar o mouse ou começar a arrastar: o navegador costuma mandar o
+      // salto do cursor até ali, não um movimento real.
+      if (this.skipNextMove) {
+        this.skipNextMove = false;
+        return;
+      }
+      const dx = e.movementX;
+      const dy = e.movementY;
+      const mag = Math.hypot(dx, dy);
+      // Pico espúrio (bug conhecido do pointer lock no Chrome): um evento centenas de pixels maior que o
+      // anterior. A mão não acelera assim de um evento para o outro, então é descartado. Sem isso, a
+      // câmera dava meia-volta sozinha.
+      if (mag > SPIKE_MIN && mag > SPIKE_RATIO * (this.lastMoveMag + SPIKE_SLACK)) return;
+      this.lastMoveMag = mag;
+      this.mouseDX += dx;
+      this.mouseDY += dy;
     }, opts);
     element.addEventListener('wheel', (e) => {
       e.preventDefault();
@@ -52,6 +78,7 @@ export class Input {
       const locked = document.pointerLockElement === this.element;
       if (locked === this._pointerLocked) return;
       this._pointerLocked = locked;
+      this.resetMoveFilter();
       this.onPointerLockChange?.(locked);
     }, opts);
   }
@@ -116,12 +143,27 @@ export class Input {
     this.abort.abort();
   }
 
+  private resetMoveFilter(): void {
+    this.lastMoveMag = 0;
+    this.skipNextMove = true;
+  }
+
   requestPointerLock(): void {
     if (!this.usePointerLock || this._pointerLocked) return;
     try {
-      // Em navegadores novos retorna Promise; falhas (ex.: usuário saiu do lock há pouco) são ignoradas.
-      const result = this.element.requestPointerLock() as unknown;
-      if (result instanceof Promise) result.catch(() => {});
+      // unadjustedMovement: movimento bruto do mouse, sem a aceleração do sistema operacional (a mesma
+      // distância da mão gira sempre o mesmo ângulo) e sem os saltos do lock comum. Onde não há suporte,
+      // a Promise falha com NotSupportedError e o lock é pedido do jeito normal.
+      // Em navegadores antigos não há Promise; outras falhas (ex.: usuário saiu do lock há pouco) são ignoradas.
+      const options = this.rawMovement ? { unadjustedMovement: true } : undefined;
+      const result = this.element.requestPointerLock(options) as unknown;
+      if (result instanceof Promise)
+        result.catch((err: unknown) => {
+          if (this.rawMovement && err instanceof DOMException && err.name === 'NotSupportedError') {
+            this.rawMovement = false;
+            this.requestPointerLock();
+          }
+        });
     } catch {
       /* sem pointer lock: o arrastar continua funcionando */
     }

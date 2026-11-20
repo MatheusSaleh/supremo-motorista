@@ -81,7 +81,7 @@ export function createTerrain(): Terrain {
     const v = cubic(row(r0 - 1), row(r0), row(r0 + 1), row(r0 + 2), tz);
     return Math.max(0, v) * shoreFactor(x, z);
   };
-  const zones = FLAT_ZONES.map((r) => ({ r, h: relief((r.minX + r.maxX) / 2, (r.minZ + r.maxZ) / 2) }));
+  const zones = flatZoneHeights(FLAT_ZONES, relief);
 
   return {
     verticalScale,
@@ -99,6 +99,35 @@ export function createTerrain(): Terrain {
       return h;
     },
   };
+}
+
+/**
+ * Altura de cada área plana. Áreas cujas faixas de transição se tocam (garagem, Tribunal, praça e palácio
+ * são vizinhos) formam um grupo com uma altura só, a média ponderada pela área. Com alturas diferentes,
+ * uma área começaria plana exatamente onde a outra termina, sem espaço para a transição: o chão ficava
+ * com um degrau vertical de vários metros (a garagem estava ~6 m abaixo da praça, no meio da pista do Eixo).
+ */
+function flatZoneHeights(rects: Rect[], relief: (x: number, z: number) => number): { r: Rect; h: number }[] {
+  const reach = FLAT_MARGIN + FLAT_BLEND;
+  const near = (a: Rect, b: Rect) =>
+    a.minX - reach <= b.maxX + reach && b.minX - reach <= a.maxX + reach && a.minZ - reach <= b.maxZ + reach && b.minZ - reach <= a.maxZ + reach;
+  // Agrupa por vizinhança (união transitiva).
+  const group = rects.map((_, i) => i);
+  const root = (i: number): number => (group[i] === i ? i : (group[i] = root(group[i])));
+  for (let i = 0; i < rects.length; i++)
+    for (let j = i + 1; j < rects.length; j++) if (near(rects[i], rects[j])) group[root(i)] = root(j);
+  const sums = new Map<number, { area: number; weighted: number }>();
+  rects.forEach((r, i) => {
+    const area = (r.maxX - r.minX) * (r.maxZ - r.minZ);
+    const s = sums.get(root(i)) ?? { area: 0, weighted: 0 };
+    s.area += area;
+    s.weighted += area * relief((r.minX + r.maxX) / 2, (r.minZ + r.maxZ) / 2);
+    sums.set(root(i), s);
+  });
+  return rects.map((r, i) => {
+    const s = sums.get(root(i))!;
+    return { r, h: s.weighted / s.area };
+  });
 }
 
 /** 0 dentro do lago, sobe suavemente até 1 a SHORE_RAMP metros da água. */
