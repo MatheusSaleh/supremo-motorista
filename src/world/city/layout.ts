@@ -89,11 +89,13 @@ export const LAKE = {
   waterLevel: -0.8,
   bedY: -4,
   shoreRoadZ: -1380,
-  shoreRoad: { minX: -1900, maxX: 2200 },
+  /** Vai até o limite oeste (M5: clubes da orla norte e píeres além do Alvorada). */
+  shoreRoad: { minX: -2250, maxX: 2200 },
   restaurants: { firstX: -650, spacing: 110, count: 5 },
 };
 export const LAGO_SUL = {
-  roadsX: [1060, 1500],
+  /** A terceira rua (M5) leva mansões até perto do limite leste. A ligação só une as duas primeiras. */
+  roadsX: [1060, 1500, 1940],
   roadEndZ: -2500,
   connectorZ: -2000,
   lotRows: { firstZ: -1490, spacing: 72, last: -2460 },
@@ -250,6 +252,35 @@ export const OESTE = {
   radioTv: { minX: -390, maxX: -168, minZ: 1880, maxZ: 2470 },
   secretarias: { minX: 362, maxX: 786, minZ: 1995, maxZ: 2228 },
   feiraTorre: { r0: 46, r1: 66 },
+};
+
+/**
+ * Orla (M5 do plano de densificação), entre a L4 e a avenida da orla: embaixadas de países fictícios em três
+ * fileiras (duas de frente para a L4/Av. das Nações e para a via das embaixadas, uma para a via), clubes
+ * de frente para a avenida da orla, a UnB no canto norte, píeres com barcos na margem norte e o "Pontão"
+ * fictício (um deque sobre a água com restaurantes) entre os restaurantes da orla e a Ponte JK.
+ */
+export const ORLA = {
+  embaixadas: {
+    sul: { minX: 820, maxX: 2240 },
+    norte: { minX: -1480, maxX: -820 },
+    rows: [
+      { minZ: -540, maxZ: -318, dir: 1 as const },
+      { minZ: -748, maxZ: -556, dir: -1 as const },
+      { minZ: -1000, maxZ: -772, dir: 1 as const },
+    ],
+    roadZ: -760,
+    lotW: 120,
+  },
+  clubes: {
+    sul: { minX: 820, maxX: 2240, minZ: -1361, maxZ: -1020 },
+    norte: { minX: -2250, maxX: -820, minZ: -1361, maxZ: -1172 },
+    lotW: 190,
+  },
+  unb: { minX: -2250, maxX: -1520, minZ: -1150, maxZ: -314, roadZ: -1160 },
+  pontao: { minX: -140, maxX: 330, deckMinZ: -1540 },
+  /** Píeres (x) na margem norte, com barcos; os dois últimos são a marina perto da Ponte JK. */
+  piers: [-2150, -1950, -1780, -1350, -1150, -950, 640, 780],
 };
 
 /**

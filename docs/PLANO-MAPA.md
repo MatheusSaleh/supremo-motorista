@@ -19,6 +19,7 @@ ou mobiliário. Árvores e o próprio chão não contam. O gramado da Esplanada 
 | Depois da M2 | 45,3% | 2,18 km² |
 | Depois da M3 | 39,9% | 2,12 km² |
 | Depois da M4 | 24,1% | 1,44 km² |
+| Depois da M5 | 11,6% | 0,64 km² |
 | Meta | < 25% | — |
 
 ## Fases
@@ -29,9 +30,9 @@ ou mobiliário. Árvores e o próprio chão não contam. O gramado da Esplanada 
 | M2 | Asas leste: quadras 200/400, vias L1–L4, faixas 600/800 | ✅ |
 | M3 | Centro: setores Comercial, Bancário, Hoteleiro e de Diversões; Autarquias Norte | ✅ |
 | M4 | Oeste: quadras 300/500/700, Eixo Monumental oeste, Setor Militar Urbano, Parque da Cidade, Sudoeste | ✅ |
-| M5 | Orla: clubes, embaixadas (países fictícios), UnB, "Pontão" fictício | pendente |
-| M6 | Vida: paradas, bancas, ipês por estação, caminhos de terra, pedestres e tráfego ambiente | pendente |
-| M7 | Gameplay: endereços nas corridas, territórios das facções, minimapa, balanceamento | pendente |
+| M5 | Orla: clubes, embaixadas (países fictícios), UnB, "Pontão" fictício | ✅ |
+| M6 | Vida: paradas, bancas, ipês por estação, caminhos de terra, pedestres e tráfego ambiente | ✅ |
+| M7 | Gameplay: endereços nas corridas, territórios das facções, minimapa, balanceamento | ✅ |
 
 ### M1 — infraestrutura
 - `occupancy.ts`: grade de ocupação e o painel "Mapa" do debug.
@@ -78,6 +79,46 @@ ou mobiliário. Árvores e o próprio chão não contam. O gramado da Esplanada 
   kartódromo, quiosques, bosques) e Sudoeste (quatro superquadras e comércio).
 - O gramado central do Eixo oeste e o Parque da Cidade contam como verde de propósito no diagnóstico.
 - Blocos residenciais: uma geometria por altura (72 m, escalada por instância).
+
+### M5 — orla
+- `orla.ts` + `ORLA` (layout.ts). Via das embaixadas (z −760) e a via do fundo da UnB; a avenida da orla
+  agora vai até o limite oeste; terceira rua de mansões no Lago Sul (x 1940).
+- Setor de Embaixadas Sul e Norte (sigla SED): três fileiras de lotes murados com portão, guarita, mastro
+  com bandeira de país FICTÍCIO (Valdória, Borealândia…), placa e um de cinco tipos de prédio.
+- Setor de Clubes Sul e Norte (SCL): sede, piscinas, quadras e, nos lotes fundos, campo de futebol.
+- UnB (SUB): o "Minhocão" (duas alas longas e levemente curvas), biblioteca em degraus, reitoria com
+  rampa, pavilhão redondo, restaurante universitário, centro esportivo, institutos genéricos e os
+  estacionamentos enormes.
+- Píeres de madeira com barcos na margem norte (a mureta ganhou aberturas) e o "Pontão" fictício, o
+  Cais Candango: deque sobre a água com restaurantes, palmeiras e guarda-corpo.
+- Carros da frota: além de 250 m só a pintura é desenhada, e as rodas não projetam sombra.
+
+### M6 — vida
+- `vida.ts`: paradas de ônibus nas vias principais (a cada ~360 m, alternando as mãos; uma em cada três
+  com banca de jornal) e caminhos de terra da parada até o endereço mais perto (não atravessam prédios).
+  As paradas vão para `Level.busStops`.
+- Ipês (12% das árvores): roxo (jun–jul), rosa (jul–ago), amarelo (ago–set) e branco (set–out) florescem
+  no mês real; fora da época ficam verdes. `?mes=0..11` na URL força o mês para testar.
+- `src/ambient/`: `graphWalk.ts` (andarilho pelo grafo de ruas com deslocamento lateral, transição suave
+  nas curvas e sonda de altura pela física, para a Ponte JK e as lombadas), `AmbientTraffic.ts` (carros na
+  mão direita, corpo cinemático, freiam atrás do jogador, dos perseguidores e uns dos outros, reduzem nas
+  curvas, nascem e somem fora da vista) e `Pedestrians.ts` (calçadas e paradas; sem colisão: diante de um
+  carro rápido, pulam para o lado e voltam, porque violência só no pastelão).
+- Densidade por qualidade (`AMBIENT_DENSITY`): Baixa 12 carros/40 pedestres, Média 28/90, Alta 45/140,
+  Ultra 70/220. Tráfego e pedestres são locais (não sincronizam no multiplayer).
+
+### M7 — gameplay
+- Corridas (`data/rides.ts`): pools novos `casas`, `comercio`, `bancario`, `hoteis`, `autarquias`,
+  `embaixadas`, `clubes`, `tv` e `pontao`, e nove motivos novos (comitiva no hotel, recepção na embaixada,
+  tênis "de trabalho", entrevista ao vivo, carimbo, comprinha, happy hour, Setor Bancário…). Endereços em
+  marcos reais (UnB, SMU, Parque da Cidade, Feira da Torre, PF etc.) continuam fora dos pools.
+- A parada da Palestrante também pode cair no comércio local ou no Cais Candango.
+- Territórios (`data/factions.ts`): 8 áreas, 4 por facção, cobrindo os bairros residenciais novos (asas
+  leste e oeste, casas da 700, Sudoeste) e sem nenhum marco real dentro.
+- Balanceamento: folga de tempo 1,6 → 1,7 (tráfego e cidade mais densa), farol do destino visível a 180 m
+  (era 140) e calor do "carro oficial" no território 0,6 → 0,45/s (os territórios cresceram).
+- Minimapa: nomes de bairros/setores (`Landmark.minor`) viram rótulos discretos, sem ponto na borda; os
+  marcos continuam com destaque e têm prioridade no espaço.
 
 ### Otimização (depois da M3)
 Medido no Chrome sem GPU (draw calls com sombra, qualidade Média):

@@ -10,6 +10,10 @@ export const factionsPtBR = {
   'territory.feira': 'Feira Vermelha',
   'territory.asaSul': 'Quadras Amarelas',
   'territory.lagoSul': 'Lago Amarelo',
+  'territory.asaNorteLeste': 'Quadras Vermelhas do Leste',
+  'territory.casas700': 'Vila Vermelha',
+  'territory.asaSulLeste': 'Quadras Amarelas do Leste',
+  'territory.sudoeste': 'Sudoeste Amarelo',
 
   'hud.polarization': 'Polarização',
   'hud.territory': 'Território {faction}: {name}',

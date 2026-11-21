@@ -34,6 +34,8 @@ import { CAMPAIGN, HEADLINE_VARIANTS, evaluateEnding, headlineKind, type EndingI
 import { Music, RADIO_PLAYLIST } from '../audio/Music';
 import { desktop } from './desktop';
 import { RoadGraph } from '../world/RoadGraph';
+import { AMBIENT_DENSITY, AmbientTraffic, type TrafficObstacle } from '../ambient/AmbientTraffic';
+import { Pedestrians, type CarThreat } from '../ambient/Pedestrians';
 import { SeatedDriver } from '../player/SeatedDriver';
 import { World } from '../world/World';
 import { createCity } from '../world/city';
@@ -87,6 +89,11 @@ export class Game {
   readonly roadGraph: RoadGraph | null;
   readonly polarization = new Polarization();
   readonly pursuers: Pursuers;
+  /** Vida na cidade (M6): tráfego ambiente e pedestres (só na cidade, com grafo de ruas). */
+  readonly traffic: AmbientTraffic | null;
+  readonly pedestrians: Pedestrians | null;
+  private readonly trafficObstacles: TrafficObstacle[] = [];
+  private readonly pedThreats: CarThreat[] = [];
   private territory: Territory | null = null;
   /** Fase 9: Medidor de Suspeição (favores do Dr. Caixeta, imprensa, Corregedoria). */
   readonly suspicion = new Suspicion();
@@ -266,6 +273,9 @@ export class Game {
     this.carEffects = new CarEffects(this.world.scene);
     this.roadGraph = level.roads?.length ? new RoadGraph(level.roads) : null;
     this.pursuers = new Pursuers(this.physics, cfg, this.world.scene, pursuerAssets, this.roadGraph, this.world, audio, this.carEffects);
+    const heightAt = level.heightAt ?? (() => 0);
+    this.traffic = this.roadGraph ? new AmbientTraffic(this.physics, this.world.scene, this.roadGraph, heightAt) : null;
+    this.pedestrians = this.roadGraph ? new Pedestrians(this.world.scene, this.roadGraph, this.physics, heightAt, level.water, level.busStops ?? []) : null;
     this.env = new Environment(this.settings.realWorld);
     this.atmosphere = new Atmosphere(this.world, audio);
     this.atmosphere.attachCar(this.car, this.allCars);
@@ -445,6 +455,9 @@ export class Game {
 
   applySettings(s: Settings): void {
     this.settings = s;
+    const density = AMBIENT_DENSITY[s.quality] ?? AMBIENT_DENSITY.media;
+    this.traffic?.setDensity(density.traffic);
+    this.pedestrians?.setDensity(density.peds);
     saveSettings(s);
     this.net.setEnabled(s.online && this.cfg.multiplayer.enabled, s.nickname);
     this.world.setShadowMapSize(s.shadowMapSize);
@@ -472,6 +485,8 @@ export class Game {
     for (const c of this.cars) c.dispose();
     this.carEffects.dispose();
     this.pursuers.dispose();
+    this.traffic?.dispose();
+    this.pedestrians?.dispose();
     this.atmosphere.dispose();
     this.rides.dispose();
     this.net.dispose();
@@ -575,6 +590,7 @@ export class Game {
     // 2) Física em passo fixo
     this.net.beforePhysics();
     this.pursuers.beforePhysics();
+    this.updateAmbientTraffic(dt, driving);
     this.physics.gravity = { x: 0, y: -this.cfg.physics.gravity, z: 0 };
     this.accumulator += dt;
     let steps = 0;
@@ -637,6 +653,7 @@ export class Game {
       this.localPlayer.update(dt, alpha);
     }
 
+    this.updatePedestrians(dt, driving);
     this.updateRides(dt, driving, carEvents);
 
     // 4) Câmera
@@ -1226,6 +1243,28 @@ export class Game {
   }
 
   /** Altura do chão (relevo) em (x, z). */
+  /** Tráfego ambiente: anda antes da física, freando atrás do jogador (a pé ou no carro) e dos perseguidores. */
+  private updateAmbientTraffic(dt: number, driving: boolean): void {
+    if (!this.traffic) return;
+    const obs = this.trafficObstacles;
+    obs.length = 0;
+    const me = driving ? this.car.position : this.localPlayer.position;
+    obs.push({ x: me.x, z: me.z });
+    for (const c of this.pursuers.active) obs.push({ x: c.position.x, z: c.position.z });
+    this.traffic.update(dt, me, this.camera, obs);
+  }
+
+  /** Pedestres: depois da física; fogem (pulando) do carro do jogador e dos perseguidores. */
+  private updatePedestrians(dt: number, driving: boolean): void {
+    if (!this.pedestrians) return;
+    const th = this.pedThreats;
+    th.length = 0;
+    const add = (p: THREE.Vector3Like, v: { x: number; z: number }) => th.push({ x: p.x, z: p.z, vx: v.x, vz: v.z });
+    if (driving) add(this.car.position, this.car.body.linvel());
+    for (const c of this.pursuers.active) add(c.position, c.body.linvel());
+    this.pedestrians.update(dt, driving ? this.car.position : this.localPlayer.position, this.camera, th);
+  }
+
   groundAt(x: number, z: number): number {
     return this.world.level?.heightAt?.(x, z) ?? 0;
   }
@@ -1413,7 +1452,9 @@ async function loadLevel(assets: Assets, source: string, onProgress: (f: number)
   if (source === 'cidade' || source === 'test') {
     onProgress(0);
     await nextFrame(); // deixa a tela de carregamento atualizar antes da geração (síncrona)
-    return source === 'cidade' ? createCity() : createTestArena();
+    // ?mes=0..11 força o mês da floração dos ipês (para testar fora de época).
+    const mes = Number(new URLSearchParams(location.search).get('mes'));
+    return source === 'cidade' ? createCity(1960, Number.isInteger(mes) && mes >= 0 && mes < 12 && location.search.includes('mes=') ? mes : undefined) : createTestArena();
   }
   return levelFromGLTF(await assets.loadGLTF(source, onProgress));
 }

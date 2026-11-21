@@ -60,7 +60,20 @@ function nearestRoadDir(rects: Rect[], x: number, z: number): number {
 }
 
 /** Árvores: bosques aleatórios em terra livre + algumas fileiras. Semente fixa → mesmo mapa sempre. */
-export function buildTrees(b: CityBuilder, land: Rect[], count: number): void {
+/**
+ * Ipês (M6): espécie, cor da flor e meses de floração em Brasília (0 = janeiro). Fora da época, a copa
+ * fica verde como as outras.
+ */
+const IPES = [
+  { color: 0x9b4fb5, months: [5, 6] }, // roxo: junho–julho
+  { color: 0xe58fb5, months: [6, 7] }, // rosa: julho–agosto
+  { color: 0xf2c418, months: [7, 8] }, // amarelo: agosto–setembro
+  { color: 0xf4f1ea, months: [8, 9] }, // branco: setembro–outubro
+];
+/** Fração das árvores que são ipês. */
+const IPE_SHARE = 0.12;
+
+export function buildTrees(b: CityBuilder, land: Rect[], count: number, month = new Date().getMonth()): void {
   const pos: { x: number; z: number; s: number }[] = [];
   const cell = 8; // grade para checar distância mínima sem O(n²)
   const grid = new Set<string>();
@@ -101,7 +114,12 @@ export function buildTrees(b: CityBuilder, land: Rect[], count: number): void {
   const trunkGeo = new THREE.CylinderGeometry(0.18, 0.28, 3, 6, 1, true).translate(0, 1.5, 0); // sem tampas (não aparecem)
   const crownGeo = new THREE.IcosahedronGeometry(2, 0).translate(0, 4.2, 0);
   const matrices = pos.map((p) => placeMatrix(p.x, 0, p.z, b.rng() * Math.PI * 2, p.s));
-  const colors = pos.map(() => new THREE.Color().setHSL(0.24 + b.rng() * 0.08, 0.45 + b.rng() * 0.2, 0.28 + b.rng() * 0.1));
+  const colors = pos.map(() => {
+    const green = new THREE.Color().setHSL(0.24 + b.rng() * 0.08, 0.45 + b.rng() * 0.2, 0.28 + b.rng() * 0.1);
+    if (b.rng() >= IPE_SHARE) return green;
+    const ipe = IPES[Math.floor(b.rng() * IPES.length)];
+    return ipe.months.includes(month) ? new THREE.Color(ipe.color).offsetHSL(0, 0, (b.rng() - 0.5) * 0.08) : green;
+  });
   const g = b.group('arvores');
   const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4f35, roughness: 1 });
   // Troncos e copas são divididos nos mesmos blocos e na mesma ordem: o id `arvore-<bloco>-<i>` liga os dois.

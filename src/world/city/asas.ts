@@ -62,7 +62,7 @@ export function buildAsas(b: CityBuilder, kit: CityKit): void {
         kit.comercio(g, cx, q.z - q.size / 2 + 12, q.z + q.size / 2 - 12, wing, `${base}/${base + 2}`);
       }
     });
-    b.landmarks.push({ name: t(wing === 'S' ? 'place.asaSul' : 'place.asaNorte'), x: slots.q200[1], z: ASAS.q200.z });
+    b.landmarks.push({ name: t(wing === 'S' ? 'place.asaSul' : 'place.asaNorte'), x: slots.q200[1], z: ASAS.q200.z , minor: true });
   }
   const qa = ASAS.q200Aeroporto;
   kit.superquadra({ cx: qa.x, cz: ASAS.q200.z, size: qa.size, floors: 6, entry: 'minX', access: AIRPORT.roadX, wing: 'S', number: 210 }, g);

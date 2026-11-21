@@ -5,7 +5,7 @@ import { formatAddress, RESTAURANT_KEYS, sectorName } from '../../data/addresses
 import type { WaterArea } from '../Level';
 import { canvasTexture } from './materials';
 import { placeMatrix, rectOf, type CityBuilder, type Rect } from './builder';
-import { BOUNDS, LAGO_SUL, LAKE, MARCOS, ROAD } from './layout';
+import { BOUNDS, LAGO_SUL, LAKE, MARCOS, ORLA, ROAD } from './layout';
 
 /** Deque fica ao lado da casa do restaurante (acesso direto pelo calçadão). */
 const DECK_OFFSET = 10;
@@ -57,6 +57,8 @@ function buildShore(b: CityBuilder, g: THREE.Object3D): void {
     gaps.push([x - 9, x + 9]);
   }
   gaps.push([MARCOS.ponte.x1 - 22, MARCOS.ponte.x1 + 22]); // cabeceira norte da ponte
+  for (const x of ORLA.piers) gaps.push([x - 4, x + 4]); // píeres (orla.ts)
+  gaps.push([ORLA.pontao.minX, ORLA.pontao.maxX]); // deque do "Pontão" (orla.ts)
   gaps.sort((a, c) => a[0] - c[0]);
   let x0 = BOUNDS.minX;
   for (const [a, c] of [...gaps, [LAKE.shoreX, LAKE.shoreX] as [number, number]]) {

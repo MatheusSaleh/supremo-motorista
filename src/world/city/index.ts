@@ -5,6 +5,8 @@ import { buildAeroporto } from './aeroporto';
 import { buildAsas } from './asas';
 import { buildCentro } from './centro';
 import { buildOeste } from './oeste';
+import { buildOrla } from './orla';
+import { buildVida } from './vida';
 import { CityBuilder, type Rect } from './builder';
 import { buildEixao } from './eixao';
 import { buildEsplanada } from './esplanada';
@@ -21,7 +23,8 @@ import { CityKit } from './quadras';
 import { createTerrain } from './terrain';
 import { measureOccupancy } from './occupancy';
 
-export function createCity(seed = 1960): Level {
+/** @param month mês (0–11) para a floração dos ipês; padrão: o mês atual. */
+export function createCity(seed = 1960, month = new Date().getMonth()): Level {
   const b = new CityBuilder(seed);
 
   // Terra firme: tudo ao norte/oeste da margem + a península do Lago Sul.
@@ -54,12 +57,14 @@ export function createCity(seed = 1960): Level {
   buildAsas(b, kit);
   buildCentro(b, kit);
   buildOeste(b, kit);
+  buildOrla(b, kit);
+  const busStops = buildVida(b);
   kit.flush();
 
   buildSigns(b);
   buildStreetLights(b);
   buildFactionFlags(b);
-  buildTrees(b, land, 2600);
+  buildTrees(b, land, 2600, month);
   buildBounds(b, BOUNDS);
 
   // Diagnóstico (só em dev): quanto da terra firme ainda é gramado vazio. Ver docs/PLANO-MAPA.md.
@@ -96,6 +101,7 @@ export function createCity(seed = 1960): Level {
     garages,
     heightAt,
     roads: b.roadSegments,
+    busStops,
     landmarks: b.landmarks,
     bounds: { ...BOUNDS },
     addresses: b.addresses,

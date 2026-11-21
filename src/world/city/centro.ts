@@ -43,7 +43,7 @@ export function buildCentro(b: CityBuilder, kit: CityKit): void {
       parkingFill: 0.55,
     };
     for (const r of C.bancario) kit.fillSector(g, side(r), bank);
-    b.landmarks.push({ name: label('place.bancarioSul', 'place.bancarioNorte'), ...center(side(C.bancario[0])) });
+    b.landmarks.push({ name: label('place.bancarioSul', 'place.bancarioNorte'), ...center(side(C.bancario[0])) , minor: true });
 
     // --- Setor Comercial ------------------------------------------------------------
     const comercial: SectorSpec = {
@@ -64,7 +64,7 @@ export function buildCentro(b: CityBuilder, kit: CityKit): void {
     };
     kit.fillSector(g, side(C.comercial), comercial);
     if (s < 0) kit.fillSector(g, C.comercialNorteExtra, comercial);
-    b.landmarks.push({ name: label('place.comercialSul', 'place.comercialNorte'), ...center(side(C.comercial)) });
+    b.landmarks.push({ name: label('place.comercialSul', 'place.comercialNorte'), ...center(side(C.comercial)) , minor: true });
 
     // --- Setor Hoteleiro (rua de serviço no meio; as duas fileiras olham para o Eixão) -----
     const H = C.hoteleiro;
@@ -92,7 +92,7 @@ export function buildCentro(b: CityBuilder, kit: CityKit): void {
       [H.minZ, H.roadZ - ROAD.local / 2 - 4],
       [H.roadZ + ROAD.local / 2 + 4, H.maxZ],
     ]) kit.fillSector(g, side({ minX: H.minX, maxX: H.maxX, minZ: z0, maxZ: z1 }), hotels);
-    b.landmarks.push({ name: label('place.hoteleiroSul', 'place.hoteleiroNorte'), x: s * 450, z: H.roadZ });
+    b.landmarks.push({ name: label('place.hoteleiroSul', 'place.hoteleiroNorte'), x: s * 450, z: H.roadZ , minor: true });
     b.signs.push({ x: s * 210, z: H.roadZ - ROAD.local / 2 - 4, yaw: Math.PI, title: `SHT-${wing}`, subtitle: sectorName('SHT') });
 
     // --- Autarquias -------------------------------------------------------------------
@@ -119,7 +119,7 @@ export function buildCentro(b: CityBuilder, kit: CityKit): void {
     kit.fillSector(g, side(A.orla), { ...agencies, cell: [100, 110] });
     // Anexos dos ministérios: blocos baixos atrás de cada fileira, sem letreiro.
     kit.fillSector(g, side(A.anexos), { ...agencies, cell: [170, 90], foot: [[70, 16]], floors: [4, 6], styles: ['brise'], signs: undefined, prefix: `anexo-${wing}`, counter: { n: 0 }, quadra: 20 });
-    if (s < 0) b.landmarks.push({ name: t('place.autarquiasNorte'), ...center(mirror(A.orla)) });
+    if (s < 0) b.landmarks.push({ name: t('place.autarquiasNorte'), ...center(mirror(A.orla)) , minor: true });
   }
 
   buildGaleria(b, kit, g, CENTRO.diversoesSul);
@@ -154,7 +154,7 @@ function buildGaleria(b: CityBuilder, kit: CityKit, g: THREE.Object3D, r: Rect):
   });
   kit.parking(g, rectOf(c.x, r.minZ + 8, pw, 16), false, 0.7);
   b.address('sdv-galeria', formatAddress('SDV', [{ kind: 'quadra', v: 3 }, { kind: 'bloco', v: 'A' }], 'S'), c.x, r.minZ + 4);
-  b.landmarks.push({ name: t('place.diversoesSul'), x: c.x, z: c.z });
+  b.landmarks.push({ name: t('place.diversoesSul'), x: c.x, z: c.z , minor: true });
 }
 
 /** Setor de Diversões Norte: o shopping, um caixote horizontal enorme com estacionamento em volta. */
@@ -169,5 +169,5 @@ function buildShopping(b: CityBuilder, kit: CityKit, g: THREE.Object3D, r: Rect)
   b.letreiro(mall, t('fun.shopping'), c.x + 6 - w / 2 - 0.08, 14, c.z + 10, -Math.PI / 2, 40, 4, { bg: '#ffffff', fg: '#b3261e' });
   kit.parking(g, rectOf(c.x, r.minZ + 8, w + 30, 16), false, 0.8);
   b.address('sdv-shopping', formatAddress('SDV', [{ kind: 'quadra', v: 2 }, { kind: 'bloco', v: 'A' }], 'N'), c.x, r.minZ + 4);
-  b.landmarks.push({ name: t('place.diversoesNorte'), x: c.x, z: c.z });
+  b.landmarks.push({ name: t('place.diversoesNorte'), x: c.x, z: c.z , minor: true });
 }

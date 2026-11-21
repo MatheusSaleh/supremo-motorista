@@ -8,6 +8,8 @@ export interface Landmark {
   name: string;
   x: number;
   z: number;
+  /** Nome de bairro/setor (não um marco): no minimapa, só o rótulo discreto, sem ponto na borda. */
+  minor?: boolean;
 }
 
 export interface LevelBounds {
@@ -66,6 +68,8 @@ export interface Level {
   heightAt?: (x: number, z: number) => number;
   /** Eixos das ruas dirigíveis (a IA navega por elas); sem eles, a IA vai direto ao alvo. */
   roads?: RoadSegment[];
+  /** Paradas de ônibus (pedestres esperando; ver ambient/Pedestrians). yaw = frente do abrigo. */
+  busStops?: { x: number; z: number; yaw: number }[];
 }
 
 /**

@@ -36,11 +36,16 @@ export interface Territory {
 
 /** Eixos do mapa: −X norte, +X sul, −Z leste, +Z oeste (ver world/city/layout.ts). */
 export const TERRITORIES: Territory[] = [
-  // Superquadras da asa norte (entre o Eixão e o limite oeste, longe do QG e do Estádio).
-  { faction: 'vermelhos', nameKey: 'territory.asaNorte', minX: -2300, maxX: -220, minZ: 1110, maxZ: 1800 },
+  // Vermelhos: superquadras da asa norte (100/300 a oeste do Eixão, sem o Estádio, o Centro de Convenções e
+  // os hotéis; 200/400 a leste), a feira e as casas da 700.
+  { faction: 'vermelhos', nameKey: 'territory.asaNorte', minX: -2300, maxX: -760, minZ: 1255, maxZ: 1860 },
+  { faction: 'vermelhos', nameKey: 'territory.asaNorteLeste', minX: -2250, maxX: -820, minZ: 400, maxZ: 1060 },
   { faction: 'vermelhos', nameKey: 'territory.feira', minX: -340, maxX: -160, minZ: 870, maxZ: 1050 },
-  // Superquadras da asa sul e o Lago Sul (mansões).
-  { faction: 'amarelos', nameKey: 'territory.asaSul', minX: 220, maxX: 2300, minZ: 1110, maxZ: 1800 },
+  { faction: 'vermelhos', nameKey: 'territory.casas700', minX: 160, maxX: 790, minZ: 2235, maxZ: 2470 },
+  // Amarelos: superquadras da asa sul (100/300 e 200/400, sem o aeroporto), o Sudoeste e o Lago Sul.
+  { faction: 'amarelos', nameKey: 'territory.asaSul', minX: 220, maxX: 2300, minZ: 1255, maxZ: 1900 },
+  { faction: 'amarelos', nameKey: 'territory.asaSulLeste', minX: 820, maxX: 1690, minZ: 400, maxZ: 1060 },
+  { faction: 'amarelos', nameKey: 'territory.sudoeste', minX: 1515, maxX: 2250, minZ: 1995, maxZ: 2470 },
   { faction: 'amarelos', nameKey: 'territory.lagoSul', minX: 920, maxX: 2300, minZ: -2600, maxZ: -1460 },
 ];
 
@@ -56,7 +61,7 @@ export const POLARIZATION = {
   /** No território, com passageiro da própria facção (bem recebido: esfria). */
   friendlyPassenger: -1.5,
   /** No território, sem passageiro ou com passageiro neutro (carro oficial já é suspeito). */
-  officialCar: 0.6,
+  officialCar: 0.45, // (M7) os territórios cresceram com a cidade densa: menos calor por segundo dentro
   /** No território acima de 90 km/h. */
   speeding: 1.5,
   /** Buzinando no território. */

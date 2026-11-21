@@ -2,7 +2,7 @@
 // Os nomes por extenso ficam no dicionário de i18n (chaves sector.*); aqui só a estrutura.
 import { t, type StringKey } from '../core/i18n';
 
-export type SectorId = 'SPTP' | 'EMB' | 'SRF' | 'EPT' | 'SQB' | 'SRL' | 'SHIP' | 'SAE' | 'SAA' | 'SBC' | 'SCR' | 'SMB' | 'CLQ' | 'SGA' | 'SCC' | 'SHT' | 'SDV' | 'SHG';
+export type SectorId = 'SPTP' | 'EMB' | 'SRF' | 'EPT' | 'SQB' | 'SRL' | 'SHIP' | 'SAE' | 'SAA' | 'SBC' | 'SCR' | 'SMB' | 'CLQ' | 'SGA' | 'SCC' | 'SHT' | 'SDV' | 'SHG' | 'SED' | 'SCL' | 'SUB';
 
 export const SECTORS: Record<SectorId, { sigla: string; nameKey: StringKey }> = {
   SPTP: { sigla: 'SPTP', nameKey: 'sector.SPTP' },
@@ -23,6 +23,9 @@ export const SECTORS: Record<SectorId, { sigla: string; nameKey: StringKey }> = 
   SHT: { sigla: 'SHT', nameKey: 'sector.SHT' },
   SDV: { sigla: 'SDV', nameKey: 'sector.SDV' },
   SHG: { sigla: 'SHG', nameKey: 'sector.SHG' },
+  SED: { sigla: 'SED', nameKey: 'sector.SED' },
+  SCL: { sigla: 'SCL', nameKey: 'sector.SCL' },
+  SUB: { sigla: 'SUB', nameKey: 'sector.SUB' },
 };
 
 /** Partes de um endereço (cada uma vira "Bloco C", "Casa 12"…, traduzidas via i18n). */

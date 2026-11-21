@@ -192,25 +192,33 @@ export class Minimap {
     ctx.font = '600 10px system-ui, sans-serif';
     ctx.textAlign = 'center';
     const labels: { x: number; y: number; w: number }[] = [];
-    for (const lm of this.landmarks) {
+    // Marcos primeiro (ponto + nome; fora do círculo, ponto na borda); depois os nomes de bairros/setores,
+    // menores e sem ponto, só onde couberem.
+    const ordered = [...this.landmarks].sort((a, c) => Number(!!a.minor) - Number(!!c.minor));
+    for (const lm of ordered) {
       const p = toScreen(lm.x, lm.z);
       const d = Math.hypot(p.x, p.y);
       const inside = d < r - 14;
-      const k = inside ? 1 : (r - 8) / d;
-      ctx.fillStyle = '#ffd34d';
-      ctx.beginPath();
-      ctx.arc(p.x * k, p.y * k, inside ? 3.5 : 2.5, 0, Math.PI * 2);
-      ctx.fill();
+      if (lm.minor && !inside) continue;
+      if (!lm.minor) {
+        const k = inside ? 1 : (r - 8) / d;
+        ctx.fillStyle = '#ffd34d';
+        ctx.beginPath();
+        ctx.arc(p.x * k, p.y * k, inside ? 3.5 : 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.font = lm.minor ? 'italic 500 9px system-ui, sans-serif' : '600 10px system-ui, sans-serif';
       // Pula o nome se encostar em outro já desenhado (o ponto continua).
       const w = ctx.measureText(lm.name).width;
-      const overlaps = labels.some((l) => Math.abs(l.y - p.y) < 12 && Math.abs(l.x - p.x) < (l.w + w) / 2 + 4);
+      const y = lm.minor ? p.y + 3 : p.y - 7;
+      const overlaps = labels.some((l) => Math.abs(l.y - y) < 12 && Math.abs(l.x - p.x) < (l.w + w) / 2 + 4);
       if (inside && !overlaps) {
-        labels.push({ x: p.x, y: p.y, w });
+        labels.push({ x: p.x, y, w });
         ctx.lineWidth = 3;
         ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-        ctx.strokeText(lm.name, p.x, p.y - 7);
-        ctx.fillStyle = '#fff';
-        ctx.fillText(lm.name, p.x, p.y - 7);
+        ctx.strokeText(lm.name, p.x, y);
+        ctx.fillStyle = lm.minor ? 'rgba(235,240,245,0.85)' : '#fff';
+        ctx.fillText(lm.name, p.x, y);
       }
     }
 

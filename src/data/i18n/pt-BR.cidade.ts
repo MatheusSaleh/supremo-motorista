@@ -8,6 +8,9 @@ export const cidadePtBR = {
   'sector.SHT': 'Setor Hoteleiro e Turístico',
   'sector.SDV': 'Setor de Diversões e Variedades',
   'sector.SHG': 'Setor de Habitações Geminadas',
+  'sector.SED': 'Setor de Embaixadas e Delegações',
+  'sector.SCL': 'Setor de Clubes e Lazer',
+  'sector.SUB': 'Setor Universitário e Bibliotecas',
 
   'place.asaNorte': 'Asa Norte',
   'place.bancarioSul': 'Setor Bancário Sul',
@@ -28,6 +31,12 @@ export const cidadePtBR = {
   'place.sudoeste': 'Sudoeste',
   'place.w3': 'W3',
   'place.casas700': 'Quadras 700',
+  'place.unb': 'UnB',
+  'place.embaixadasSul': 'Setor de Embaixadas Sul',
+  'place.embaixadasNorte': 'Setor de Embaixadas Norte',
+  'place.clubesSul': 'Setor de Clubes Sul',
+  'place.clubesNorte': 'Setor de Clubes Norte',
+  'place.pontao': 'Cais Candango',
   'place.asaSul': 'Asa Sul',
 
   // Lojas do comércio local (uma por letreiro; sorteadas com semente fixa).
@@ -87,6 +96,36 @@ export const cidadePtBR = {
   'fun.parque': 'Parque de Diversões Ipê Feliz',
   'fun.kart': 'Kartódromo',
   'fun.pavilhao': 'Pavilhão de Exposições',
+
+  // Embaixadas de países FICTÍCIOS (nenhum país real).
+  'embassy.plaque': 'Embaixada de {pais}',
+  'country.1': 'Valdória',
+  'country.2': 'Borealândia',
+  'country.3': 'Montesol',
+  'country.4': 'Costa Ventura',
+  'country.5': 'Lunária',
+  'country.6': 'Ilhas Coralinas',
+  'country.7': 'Estepária',
+  'country.8': 'Altomonte',
+  'country.9': 'Mareterra',
+  'country.10': 'Fiordelândia',
+  'country.11': 'Solária do Norte',
+  'country.12': 'Arquipélago de Brumas',
+
+  // Clubes e o "Pontão" fictício.
+  'club.1': 'Clube Náutico do Cerrado',
+  'club.2': 'Associação Atlética dos Servidores',
+  'club.3': 'Clube Ipê de Regatas',
+  'club.4': 'Country Clube Candango',
+  'club.5': 'Clube do Recesso',
+  'club.6': 'Clube dos Assessores',
+  'club.7': 'Clube Seriema',
+  'club.8': 'Clube da Comissão',
+  'pontao.1': 'Cais Grill',
+  'pontao.2': 'Sushi do Lago',
+  'pontao.3': 'Pizzaria Ponte Aérea',
+  'pontao.4': 'Sorveteria Verão Eterno',
+  'pontao.5': 'Bar do Píer',
 
   // Lotes institucionais (faixas 600/800).
   'lot.igreja': 'Paróquia Nossa Senhora do Cerrado',

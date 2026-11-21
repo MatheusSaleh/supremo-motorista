@@ -21,7 +21,7 @@ export const ARCHETYPE_RULES = {
   palestrante: {
     /** Parada obrigatória no caminho: segundos parado lá e pools onde ela pode ficar. */
     stopSeconds: 2.5,
-    stopPools: ['esplanada', 'quadras', 'feira', 'orla', 'tribunal'] as PoolId[],
+    stopPools: ['esplanada', 'quadras', 'feira', 'orla', 'tribunal', 'comercio', 'pontao'] as PoolId[],
     /** A parada não pode ficar a menos disto da origem ou do destino (m). */
     stopMinDistance: 250,
     stopBonus: 60,

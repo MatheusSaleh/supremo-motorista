@@ -46,7 +46,7 @@ export function buildOeste(b: CityBuilder, kit: CityKit): void {
   for (const s of [1, -1]) {
     for (const x of Q.comercioX) kit.comercio(g, s * x, Q.centerZ - Q.size / 2 + 12, Q.centerZ + Q.size / 2 - 12, s > 0 ? 'S' : 'N', `1${Math.round(x / 100)}`);
   }
-  b.landmarks.push({ name: t('place.superquadras'), x: Q.centersX[2], z: Q.centerZ });
+  b.landmarks.push({ name: t('place.superquadras'), x: Q.centersX[2], z: Q.centerZ , minor: true });
 
   // --- Quadras 300 (acesso pela W3) ------------------------------------------------------
   const count = { S: 0, N: 0 };
@@ -61,16 +61,16 @@ export function buildOeste(b: CityBuilder, kit: CityKit): void {
     for (const x of O.sudoeste.xs) kit.superquadra({ cx: x, cz: row.z, size: row.size, floors: 6, entry: row.entry, access: row.access, wing: 'S', number: (n += 2) }, g);
     kit.comercio(g, (O.sudoeste.xs[0] + O.sudoeste.xs[1]) / 2, row.z - row.size / 2 + 12, row.z + row.size / 2 - 12, 'S', `${n - 2}/${n}`);
   }
-  b.landmarks.push({ name: t('place.sudoeste'), x: O.sudoeste.xs[0], z: O.sudoeste.rows[0].z });
+  b.landmarks.push({ name: t('place.sudoeste'), x: O.sudoeste.xs[0], z: O.sudoeste.rows[0].z , minor: true });
 
   // --- Comércio da W3 (500) ---------------------------------------------------------------
   kit.shopRow(g, 170, EIXAO.maxX - 10, O.comercio500.minZ, O.comercio500.maxZ, -1, 'S', 'W3-5');
   kit.shopRow(g, EIXAO.minX + 10, O.w3.norteMaxX - 30, O.comercio500.minZ, O.comercio500.maxZ, -1, 'N', 'W3-5');
-  b.landmarks.push({ name: t('place.w3'), x: 1150, z: O.w3.z });
+  b.landmarks.push({ name: t('place.w3'), x: 1150, z: O.w3.z , minor: true });
 
   // --- Casas geminadas da 700 ----------------------------------------------------------------
   O.casas700.rows.forEach(([z, face], i) => kit.houseRow(O.casas700.minX, O.casas700.maxX, z, face, 'S', 702 + 2 * Math.floor(i / 2)));
-  b.landmarks.push({ name: t('place.casas700'), x: (O.casas700.minX + O.casas700.maxX) / 2, z: 2340 });
+  b.landmarks.push({ name: t('place.casas700'), x: (O.casas700.minX + O.casas700.maxX) / 2, z: 2340 , minor: true });
 
   // --- Setor Militar Urbano ----------------------------------------------------------------
   buildSmu(b, kit, g);
@@ -137,7 +137,7 @@ function buildFeiraTorre(b: CityBuilder, g: THREE.Object3D): void {
   tents.userData.noCollision = true;
   tents.userData.cullDistance = 600;
   b.landmarks.push({ name: t('place.feiraTorre'), x, z: z + r1 });
-  b.address('feira-torre', formatAddress('SCR', [{ kind: 'lote', v: 8 }]), x + r1 + 10, z);
+  b.address('torre-feira', formatAddress('SCR', [{ kind: 'lote', v: 8 }]), x + r1 + 10, z);
 }
 
 /** Centro de Convenções: bloco longo e baixo com brises, sob uma laje de cobertura que avança sobre a entrada. */
@@ -324,7 +324,7 @@ function buildSmu(b: CityBuilder, kit: CityKit, g: THREE.Object3D): void {
     quadra: 2,
     parkingFill: 0.4,
   });
-  b.landmarks.push({ name: t('place.smu'), x: -1850, z: 2200 });
+  b.landmarks.push({ name: t('place.smu'), x: -1850, z: 2200 , minor: true });
   b.signs.push({ x: S.maxX - 20, z: OESTE.w3.z + ROAD.main / 2 + 4, yaw: 0, title: 'SMB', subtitle: sectorName('SMB') });
 }
 

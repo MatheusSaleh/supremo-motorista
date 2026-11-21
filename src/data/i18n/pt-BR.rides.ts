@@ -25,6 +25,15 @@ export const ridesPtBR = {
   'ride.reason.feira': 'para comprar pastel "com a população"',
   'ride.reason.casa': 'para casa, depois de um dia exaustivo de vistas',
   'ride.reason.cafezinho': 'para um cafezinho rápido no Banco Confiança',
+  'ride.reason.hotel': 'para deixar a comitiva no hotel (diárias por conta de quem mesmo?)',
+  'ride.reason.hotelExpediente': 'do hotel direto para o expediente (o café da manhã atrasou)',
+  'ride.reason.embaixada': 'para uma recepção numa embaixada de um país que ninguém acha no mapa',
+  'ride.reason.clube': 'para uma partida de tênis "estritamente de trabalho"',
+  'ride.reason.entrevista': 'para uma entrevista ao vivo (sem responder à pergunta)',
+  'ride.reason.carimbo': 'para carimbar um ofício que precisa de três carimbos',
+  'ride.reason.compras': 'para "uma comprinha rápida" no comércio local',
+  'ride.reason.happyHour': 'para um happy hour de "alinhamento institucional"',
+  'ride.reason.bancario': 'para uma reunião no Setor Bancário (pauta: a pauta)',
 
   // HUD da corrida.
   'ride.toPickup': 'Buscar {passenger}',

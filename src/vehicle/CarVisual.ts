@@ -9,6 +9,8 @@ import { mergeByMaterial } from './mergeParts';
 
 /** Distância (m) da câmera até o carro abaixo da qual o interior é desenhado (pelo vidro não se vê de longe). */
 const INTERIOR_NEAR = 14;
+/** Além desta distância (m) só a pintura (a silhueta) é desenhada: rodas, vidros e detalhes viram poucos pixels. */
+const DETAIL_FAR = 250;
 
 export interface CarModel {
   root: THREE.Group;
@@ -150,11 +152,16 @@ export function createCarModelFromAsset(asset: CarAsset, paintColor: number | nu
   };
 
   const wheels: THREE.Group[] = [];
+  const wheelMeshes: THREE.Mesh[] = [];
   const wheelSpins: THREE.Object3D[] = [];
   WHEEL_ORDER.forEach((name, i) => {
     const wheel = adopt(part(name)!, false);
     wheel.position.set(0, 0, 0); // a origem do nó é o cubo da roda (garantido na conversão)
-    mergeByMaterial(wheel); // aro, pneu, raios… viram poucas malhas (a roda gira inteira)
+    // Aro, pneu, raios… viram poucas malhas (a roda gira inteira). Sem sombra: fica escondida sob o carro.
+    for (const m of mergeByMaterial(wheel)) {
+      m.castShadow = false;
+      wheelMeshes.push(m);
+    }
     const steer = new THREE.Group(); // posicionado pelo Car (suspensão) e girado em Y (esterço)
     const spin = new THREE.Group(); // gira em X (rolagem)
     spin.add(wheel);
@@ -256,11 +263,20 @@ export function createCarModelFromAsset(asset: CarAsset, paintColor: number | nu
   // Vigia: a maior malha da lataria (a pintura), que está no quadro sempre que o carro está.
   const watcher = bodyMeshes.reduce<THREE.Mesh | null>((best, m) => (!best || m.geometry.attributes.position.count > best.geometry.attributes.position.count ? m : best), null);
   interior.root.visible = false;
+  // De longe, tudo menos a vigia (a pintura) some; a vigia continua sendo desenhada e reacende o resto.
+  const farHidden = [...bodyMeshes.filter((m) => m !== watcher), ...wheelMeshes];
+  let detailShown = true;
   if (watcher) {
     watcher.onBeforeRender = (_r, _s, camera) => {
       camera.getWorldPosition(camPos);
       body.getWorldPosition(carPos);
-      interior.root.visible = camPos.distanceToSquared(carPos) < INTERIOR_NEAR * INTERIOR_NEAR;
+      const d2 = camPos.distanceToSquared(carPos);
+      interior.root.visible = d2 < INTERIOR_NEAR * INTERIOR_NEAR;
+      const near = d2 < DETAIL_FAR * DETAIL_FAR;
+      if (near !== detailShown) {
+        detailShown = near;
+        for (const m of farHidden) m.visible = near;
+      }
     };
   }
   const half = bb.getSize(new THREE.Vector3()).multiplyScalar(0.5);

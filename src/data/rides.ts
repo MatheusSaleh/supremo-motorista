@@ -38,6 +38,17 @@ export const POOLS = {
   feira: ['feira-', 'rodoviaria'],
   aeroporto: ['aeroporto-embarque'],
   banco: ['banco'],
+  // Cidade densa (M7): setores fictícios novos. Ficam de fora os endereços em marcos reais (UnB, Setor
+  // Militar Urbano, Parque da Cidade, Feira da Torre, PF…), que são só cenário.
+  casas: ['shg-'],
+  comercio: ['clq-', 'scc-', 'sdv-'],
+  bancario: ['sbc-'],
+  hoteis: ['sht-'],
+  autarquias: ['saa-', 'sga-', 'anexo-'],
+  embaixadas: ['sed-'],
+  clubes: ['scl-'],
+  tv: ['srt-'],
+  pontao: ['pontao'],
 } satisfies Record<string, string[]>;
 
 export type PoolId = keyof typeof POOLS;
@@ -60,16 +71,26 @@ export interface RideTemplate {
 export const RIDES: RideTemplate[] = [
   { id: 'almoco-orla', from: ['tribunal', 'esplanada'], to: ['orla'], reasonKey: 'ride.reason.almoco', weight: 3 },
   { id: 'jantar-mansao', from: ['tribunal', 'orla'], to: ['mansoes'], reasonKey: 'ride.reason.jantar', weight: 2 },
-  { id: 'sessao', from: ['mansoes', 'quadras', 'orla'], to: ['tribunal'], reasonKey: 'ride.reason.sessao', weight: 3 },
+  { id: 'sessao', from: ['mansoes', 'quadras', 'orla', 'casas', 'hoteis'], to: ['tribunal'], reasonKey: 'ride.reason.sessao', weight: 3 },
   { id: 'reuniao-ministerio', from: ['tribunal', 'quadras'], to: ['esplanada'], reasonKey: 'ride.reason.reuniao', weight: 2 },
   { id: 'voo', from: ['tribunal', 'mansoes', 'esplanada'], to: ['aeroporto'], reasonKey: 'ride.reason.voo', weight: 2 },
   { id: 'feira', from: ['tribunal', 'quadras'], to: ['feira'], reasonKey: 'ride.reason.feira', weight: 1 },
-  { id: 'casa', from: ['tribunal', 'esplanada'], to: ['quadras', 'mansoes'], reasonKey: 'ride.reason.casa', weight: 2 },
+  { id: 'casa', from: ['tribunal', 'esplanada'], to: ['quadras', 'mansoes', 'casas'], reasonKey: 'ride.reason.casa', weight: 2 },
+  // Cidade densa (M7).
+  { id: 'hotel-comitiva', from: ['aeroporto'], to: ['hoteis'], reasonKey: 'ride.reason.hotel', weight: 2 },
+  { id: 'hotel-expediente', from: ['hoteis'], to: ['tribunal', 'esplanada'], reasonKey: 'ride.reason.hotelExpediente', weight: 2 },
+  { id: 'embaixada', from: ['tribunal', 'esplanada', 'hoteis'], to: ['embaixadas'], reasonKey: 'ride.reason.embaixada', weight: 2 },
+  { id: 'clube', from: ['tribunal', 'quadras', 'casas'], to: ['clubes'], reasonKey: 'ride.reason.clube', weight: 2 },
+  { id: 'entrevista', from: ['tribunal', 'esplanada'], to: ['tv'], reasonKey: 'ride.reason.entrevista', weight: 1 },
+  { id: 'carimbo', from: ['quadras', 'casas', 'comercio'], to: ['autarquias'], reasonKey: 'ride.reason.carimbo', weight: 2 },
+  { id: 'compras', from: ['quadras', 'casas', 'tribunal'], to: ['comercio'], reasonKey: 'ride.reason.compras', weight: 2 },
+  { id: 'happy-hour', from: ['tribunal', 'autarquias', 'bancario'], to: ['pontao', 'orla'], reasonKey: 'ride.reason.happyHour', weight: 1 },
+  { id: 'setor-bancario', from: ['tribunal', 'esplanada'], to: ['bancario'], reasonKey: 'ride.reason.bancario', weight: 1 },
   // O Banco Confiança é fictício; o Dr. Rubens Caixeta entra na Fase 9.
   { id: 'cafezinho', from: ['tribunal', 'esplanada'], to: ['banco'], reasonKey: 'ride.reason.cafezinho', weight: 1 },
   // Favores do Dr. Caixeta (Fase 9). A maleta vai sozinha no banco de trás.
   { id: 'favor-carona', from: ['banco'], to: ['tribunal', 'mansoes', 'orla'], reasonKey: 'favor.reason.carona', passengers: ['caixeta'], favor: 'carona', maxDistance: 3600 },
-  { id: 'favor-maleta', from: ['banco'], to: ['mansoes', 'orla', 'quadras'], reasonKey: 'favor.reason.maleta', passengers: ['caixeta'], favor: 'maleta', maxDistance: 3600 },
+  { id: 'favor-maleta', from: ['banco'], to: ['mansoes', 'orla', 'quadras', 'hoteis', 'clubes'], reasonKey: 'favor.reason.maleta', passengers: ['caixeta'], favor: 'maleta', maxDistance: 3600 },
 ];
 
 /** Tempo e distância. */
@@ -79,7 +100,7 @@ export const RIDE_TIMING = {
   maxDistance: 2300,
   /** Tempo limite = distância / velocidade média × folga + bônus fixo (s), arredondado para 5 s. */
   avgSpeed: 22,
-  slack: 1.6, // o caminho pelas pistas é bem maior que a linha reta
+  slack: 1.7, // o caminho pelas pistas é bem maior que a linha reta (e agora há tráfego)
   extraSeconds: 25,
   /** Raio (m) para embarque e para a área de desembarque; velocidade máxima (km/h) para "parado". */
   pickupRadius: 12,
@@ -92,7 +113,7 @@ export const RIDE_TIMING = {
   nextCallDelay: 7,
   callExpires: 25,
   /** Distância em que o farol do destino começa a aparecer (m): achar o endereço faz parte da piada. */
-  beaconRevealDistance: 140,
+  beaconRevealDistance: 180, // a cidade densa esconde mais o endereço
 };
 
 /** Pagamento (R$). */
