@@ -26,13 +26,24 @@ import { ShowcaseSky } from './sky';
  * compensa a câmera de lado: assim o Congresso cai perto do meio do quadro, entre o texto do portfólio e a mesa.
  */
 const SITE = { x: 0, z: 260, height: 34, yaw: 0.55 };
-/** Câmera (local à sala): atrás e à esquerda do personagem, para ver a tela e a janela. */
-const CAM = { pos: new THREE.Vector3(-2.2, 1.66, 2.2), look: new THREE.Vector3(0.18, 1.3, -3.2) };
 /**
- * Campo de visão horizontal fixo (graus): a composição (texto do portfólio à esquerda, Congresso a ~60% da
- * largura, mesa e personagem a ~80%) fica igual em qualquer proporção de tela; o vertical se ajusta.
+ * Enquadramentos da câmera (locais à sala), escolhidos pela proporção da tela. O campo de visão horizontal (hfov,
+ * graus) é fixo em cada um e o vertical se ajusta, para a composição ficar igual em qualquer tamanho.
+ *  - paisagem (desktop, fundo do topo): atrás e à esquerda do personagem; texto do portfólio à esquerda,
+ *    Congresso a ~60% da largura, mesa e personagem a ~80%;
+ *  - retrato (celular, quadro no topo): mais perto, por cima do ombro, com o Congresso no alto da janela.
  */
-const HFOV = 80;
+interface CameraPreset {
+  pos: THREE.Vector3;
+  look: THREE.Vector3;
+  hfov: number;
+  /** Proporção (largura/altura) usada para descartar a cidade fora do quadro, com folga. */
+  probeAspect: number;
+}
+const LANDSCAPE: CameraPreset = { pos: new THREE.Vector3(-2.2, 1.66, 2.2), look: new THREE.Vector3(0.18, 1.3, -3.2), hfov: 80, probeAspect: 2.8 };
+const PORTRAIT: CameraPreset = { pos: new THREE.Vector3(0.2, 1.72, 0.4), look: new THREE.Vector3(2.15, 1.42, -3.2), hfov: 56, probeAspect: 0.9 };
+/** Abaixo desta proporção, o enquadramento retrato. */
+const PORTRAIT_BELOW = 1.25;
 const FPS = 30;
 
 export class Showcase {
@@ -89,13 +100,11 @@ export class Showcase {
       return null;
     });
 
-    // A cidade é gerada em código (síncrono): dá um quadro para a página respirar antes.
+    // A cidade é gerada em código, em etapas (ver city.ts): dá um quadro para a página respirar antes.
     await new Promise((r) => requestAnimationFrame(r));
     const t0 = performance.now();
     progress('city', 0);
-    // O postMessage sai antes da geração (síncrona) travar esta página por alguns segundos.
-    await new Promise((r) => setTimeout(r, 0));
-    const city = createShowcaseCity(...viewProbe());
+    const city = await createShowcaseCity(...viewProbe());
     progress('city', 1);
     if (new URLSearchParams(location.search).has('debug')) console.info(`[vitrine] cidade em ${Math.round(performance.now() - t0)} ms`);
     this.scene.add(city.root);
@@ -103,7 +112,7 @@ export class Showcase {
       o.matrixAutoUpdate = false;
     });
 
-    const floorY = city.heightAt(SITE.x, SITE.z) + SITE.height;
+    const floorY = SITE.height; // cidade plana (city.ts)
     this.room.position.set(SITE.x, floorY, SITE.z);
     this.room.rotation.y = SITE.yaw;
     this.room.updateMatrixWorld(true);
@@ -118,9 +127,7 @@ export class Showcase {
     // A chuva cai lá fora: a caixa dela (70 m, alinhada aos eixos do mundo, não gira com a sala) fica além do vidro.
     this.room.localToWorld(this.rainCenter.set(0, 0, -ROOM.d / 2 - 60));
 
-    this.room.localToWorld(this.camBase.copy(CAM.pos));
-    this.room.localToWorld(this.lookAt.copy(CAM.look));
-    hideFarDetail(city.root, this.camBase);
+    hideFarDetail(city.root, this.room.position);
 
     const character = await characterPromise;
     if (character) this.seat(new SeatedDriver(character, config));
@@ -248,8 +255,11 @@ export class Showcase {
     this.renderer.setSize(w, h, false);
     const aspect = w / h;
     this.camera.aspect = aspect;
-    const vfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(HFOV / 2)) / aspect);
-    this.camera.fov = THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(vfov), 34, 72);
+    const preset = aspect < PORTRAIT_BELOW ? PORTRAIT : LANDSCAPE;
+    this.room.localToWorld(this.camBase.copy(preset.pos));
+    this.room.localToWorld(this.lookAt.copy(preset.look));
+    const vfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(preset.hfov / 2)) / aspect);
+    this.camera.fov = THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(vfov), 34, 80);
     this.camera.updateProjectionMatrix();
   }
 }
@@ -262,30 +272,35 @@ function progress(stage: ShowcaseStage, value: number): void {
 }
 
 /**
- * O que a câmera pode ver, no plano antes do relevo, com folga (campo de visão mais largo que o de qualquer
- * proporção de tela): frustum para descartar o resto da cidade e o retângulo em planta que ele cobre.
+ * O que os enquadramentos podem ver, com folga: um frustum por enquadramento (para descartar o resto da cidade;
+ * girar o celular troca de um para o outro) e o retângulo em planta que eles cobrem.
  */
-function viewProbe(): [THREE.Frustum, Rect] {
+function viewProbe(): [THREE.Frustum[], Rect] {
   const site = new THREE.Object3D();
   site.position.set(SITE.x, SITE.height, SITE.z);
   site.rotation.y = SITE.yaw;
   site.updateMatrixWorld(true);
-  const probe = new THREE.PerspectiveCamera(74, 2.8, 0.5, 3000);
-  probe.position.copy(site.localToWorld(CAM.pos.clone()));
-  probe.lookAt(site.localToWorld(CAM.look.clone()));
-  probe.updateMatrixWorld(true);
-  const frustum = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(probe.projectionMatrix, probe.matrixWorldInverse));
-  const area: Rect = { minX: probe.position.x, maxX: probe.position.x, minZ: probe.position.z, maxZ: probe.position.z };
-  const p = new THREE.Vector3();
-  for (const x of [-1, 1])
-    for (const y of [-1, 1]) {
-      p.set(x, y, 1).unproject(probe);
-      area.minX = Math.min(area.minX, p.x);
-      area.maxX = Math.max(area.maxX, p.x);
-      area.minZ = Math.min(area.minZ, p.z);
-      area.maxZ = Math.max(area.maxZ, p.z);
-    }
-  return [frustum, area];
+  const frustums: THREE.Frustum[] = [];
+  const area: Rect = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
+  const grow = (p: THREE.Vector3) => {
+    area.minX = Math.min(area.minX, p.x);
+    area.maxX = Math.max(area.maxX, p.x);
+    area.minZ = Math.min(area.minZ, p.z);
+    area.maxZ = Math.max(area.maxZ, p.z);
+  };
+  for (const preset of [LANDSCAPE, PORTRAIT]) {
+    const hfov = THREE.MathUtils.degToRad(preset.hfov + 14);
+    const vfov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(hfov / 2) / preset.probeAspect));
+    const probe = new THREE.PerspectiveCamera(Math.min(vfov, 100), preset.probeAspect, 0.5, 3000);
+    probe.position.copy(site.localToWorld(preset.pos.clone()));
+    probe.lookAt(site.localToWorld(preset.look.clone()));
+    probe.updateMatrixWorld(true);
+    frustums.push(new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(probe.projectionMatrix, probe.matrixWorldInverse)));
+    grow(probe.position);
+    const p = new THREE.Vector3();
+    for (const x of [-1, 1]) for (const y of [-1, 1]) grow(p.set(x, y, 1).unproject(probe));
+  }
+  return [frustums, area];
 }
 
 /** Câmera fixa: some de vez com os detalhes (árvores, postes, placas) além da distância de desenho. */

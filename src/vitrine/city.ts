@@ -1,15 +1,19 @@
-// A cidade da vitrine: os mesmos geradores do jogo (world/city), na mesma ordem de createCity(), mas com a
-// câmera fixa já conhecida. Antes de assentar tudo no relevo (a etapa cara: ~10 s para o mapa inteiro), descarta o
-// que fica fora do campo de visão da janela, e o chão só cobre a área que aparece. Sem garagens, colisores
-// nem diagnóstico. Em produção, num PC bom, a montagem leva uns 5 s: por isso o portfólio mostra antes uma imagem
-// estática e embute esta página de outro domínio (processo separado, não trava a rolagem do site). Se createCity() ganhar regiões novas, acrescente aqui também (senão só não aparecem).
+// A cidade da vitrine: os mesmos geradores do jogo (world/city), na mesma ordem de createCity(), mas para uma câmera
+// fixa já conhecida. Diferenças, todas para caber num celular:
+//  - plana: sem assentar no relevo (drape), que era ~80% do tempo (vista da janela, a inclinação do Eixo quase
+//    não aparece); o chão é subdividido só para o tingimento (tintGround) ter detalhe;
+//  - só o que os enquadramentos da câmera (paisagem e retrato) alcançam, e o chão só cobre essa área;
+//  - montada em etapas, com uma pausa entre elas: nenhum trecho trava a página por muito tempo (no iOS o iframe
+//    divide o processo com o portfólio);
+//  - malhas estáticas de mesmo material agrupadas (poucas centenas de draw calls).
+// Sem garagens, colisores, muros-limite nem diagnóstico. Se createCity() ganhar regiões novas, acrescente aqui
+// também (senão só não aparecem).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { buildAeroporto } from '../world/city/aeroporto';
 import { buildAsas } from '../world/city/asas';
 import { CityBuilder, type Rect } from '../world/city/builder';
 import { buildCentro } from '../world/city/centro';
-import { drapeOnTerrain } from '../world/city/drape';
 import { buildEixao } from '../world/city/eixao';
 import { buildEsplanada } from '../world/city/esplanada';
 import { tintGround } from '../world/city/ground';
@@ -23,19 +27,20 @@ import { buildPonte } from '../world/city/ponte';
 import { buildPraca } from '../world/city/praca';
 import { buildFactionFlags, buildSigns, buildStreetLights, buildTrees } from '../world/city/props';
 import { CityKit } from '../world/city/quadras';
-import { createTerrain } from '../world/city/terrain';
 import { buildVida } from '../world/city/vida';
 
 export interface ShowcaseCity {
   root: THREE.Group;
-  heightAt: (x: number, z: number) => number;
 }
 
+/** Devolve a vez ao navegador entre as etapas (desenha a tela de carregamento, atende a rolagem). */
+const breathe = () => new Promise<void>((r) => setTimeout(r, 0));
+
 /**
- * @param view frustum da câmera da vitrine (com folga), no plano antes do relevo (chão em y = 0).
- * @param area retângulo em planta que contém tudo o que o frustum alcança (corta o chão).
+ * @param views frustums dos enquadramentos da câmera (com folga), em coordenadas do mundo.
+ * @param area retângulo em planta que contém tudo o que eles alcançam (corta o chão).
  */
-export function createShowcaseCity(view: THREE.Frustum, area: Rect, seed = 1960): ShowcaseCity {
+export async function createShowcaseCity(views: THREE.Frustum[], area: Rect, seed = 1960): Promise<ShowcaseCity> {
   const b = new CityBuilder(seed);
 
   const land: Rect[] = [
@@ -49,48 +54,55 @@ export function createShowcaseCity(view: THREE.Frustum, area: Rect, seed = 1960)
     const w = r.maxX - r.minX;
     const d = r.maxZ - r.minZ;
     const m = b.box(ground, w, 1, d, lawnMaterial(b.mats, w, d), (r.minX + r.maxX) / 2, -0.5, (r.minZ + r.maxZ) / 2);
+    // Sem o relevo, quem subdividia o chão era o drape: aqui, uma grade de ~40 m para o tingimento.
+    m.geometry.dispose();
+    m.geometry = new THREE.BoxGeometry(w, 1, d, Math.min(96, Math.ceil(w / 40)), 1, Math.min(96, Math.ceil(d / 40)));
     m.castShadow = false;
     m.userData.surface = 'grass';
     m.userData.drape = 'ground';
   }
   b.occupy({ minX: -EIXO.lawnHalfWidth, maxX: EIXO.lawnHalfWidth, minZ: EIXO.walkStartZ, maxZ: EIXO.walkEndZ });
 
-  buildEsplanada(b);
-  buildPraca(b);
-  buildLago(b);
-  buildEixao(b);
-  buildAeroporto(b);
-  buildMarcos(b);
-  buildPonte(b);
+  const steps: (() => void)[] = [
+    () => buildEsplanada(b),
+    () => buildPraca(b),
+    () => buildLago(b),
+    () => buildEixao(b),
+    () => buildAeroporto(b),
+    () => buildMarcos(b),
+    () => buildPonte(b),
+  ];
+  for (const step of steps) {
+    step();
+    await breathe();
+  }
   const kit = new CityKit(b);
-  buildAsas(b, kit);
-  buildCentro(b, kit);
-  buildOeste(b, kit);
-  buildOrla(b, kit);
-  buildVida(b);
+  for (const step of [() => buildAsas(b, kit), () => buildCentro(b, kit), () => buildOeste(b, kit), () => buildOrla(b, kit), () => buildVida(b)]) {
+    step();
+    await breathe();
+  }
   kit.flush();
+  await breathe();
   buildSigns(b);
   buildStreetLights(b);
   buildFactionFlags(b);
   buildTrees(b, land, 2600, new Date().getMonth());
-  // Sem os muros-limite do mapa: ficam na neblina e eram ~0,8 s de relevo.
+  await breathe();
 
-  pruneOutside(b.root, view);
-
-  const terrain = createTerrain();
-  const heightAt = (x: number, z: number) => terrain.heightAt(x, z);
-  drapeOnTerrain(b.root, heightAt);
+  pruneOutside(b.root, views);
+  await breathe();
   tintGround(b.root);
   b.root.updateMatrixWorld(true);
   mergeStatic(b.root);
-  return { root: b.root, heightAt };
+  return { root: b.root };
 }
 
 /**
  * Tira da cena o que o frustum não alcança: grupos e malhas inteiros e, nas instâncias (prédios, carros
  * parados, árvores), cada instância fora dele. O chão fica (já foi cortado pela área).
  */
-function pruneOutside(root: THREE.Object3D, view: THREE.Frustum): void {
+function pruneOutside(root: THREE.Object3D, views: THREE.Frustum[]): void {
+  const seen = (box: THREE.Box3) => views.some((v) => v.intersectsBox(box));
   root.updateMatrixWorld(true);
   const box = new THREE.Box3();
   const m = new THREE.Matrix4();
@@ -98,13 +110,13 @@ function pruneOutside(root: THREE.Object3D, view: THREE.Frustum): void {
     for (const child of [...obj.children]) {
       if (child.userData.drape === 'ground') continue;
       if (child instanceof THREE.InstancedMesh) {
-        compactInstances(child, view, box, m);
+        compactInstances(child, seen, box, m);
         if (child.count === 0) child.removeFromParent();
         continue;
       }
       box.setFromObject(child);
       if (box.isEmpty()) continue;
-      if (!view.intersectsBox(box)) {
+      if (!seen(box)) {
         child.removeFromParent();
         continue;
       }
@@ -115,7 +127,7 @@ function pruneOutside(root: THREE.Object3D, view: THREE.Frustum): void {
 }
 
 /** Mantém só as instâncias dentro do frustum, no começo do buffer (a ordem das demais não importa aqui). */
-function compactInstances(mesh: THREE.InstancedMesh, view: THREE.Frustum, box: THREE.Box3, m: THREE.Matrix4): void {
+function compactInstances(mesh: THREE.InstancedMesh, seen: (box: THREE.Box3) => boolean, box: THREE.Box3, m: THREE.Matrix4): void {
   if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
   const local = mesh.geometry.boundingBox!;
   let kept = 0;
@@ -124,7 +136,7 @@ function compactInstances(mesh: THREE.InstancedMesh, view: THREE.Frustum, box: T
     mesh.getMatrixAt(i, m);
     m.premultiply(mesh.matrixWorld);
     box.copy(local).applyMatrix4(m);
-    if (!view.intersectsBox(box)) continue;
+    if (!seen(box)) continue;
     if (kept !== i) {
       mesh.getMatrixAt(i, m);
       mesh.setMatrixAt(kept, m);
