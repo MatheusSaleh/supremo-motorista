@@ -1,7 +1,7 @@
 // Escritório da vitrine: sala com parede de vidro (virada para −Z, o leste: a Esplanada), mesa com dois
 // monitores, cadeira, estante, planta e luminária. Coordenadas locais: chão em y = 0, centro da sala na origem.
 import * as THREE from 'three';
-import type { CodeScreen, DeskClock } from './screens';
+import { StatsPanel, type CodeScreen, type CommitScreen, type DeskClock } from './screens';
 
 export const ROOM = { w: 9, d: 6.4, h: 3.2 };
 const WIN_Z = -ROOM.d / 2;
@@ -21,7 +21,7 @@ export interface Office {
   ceilingPanels: THREE.MeshStandardMaterial;
 }
 
-export function buildOffice(code: CodeScreen, clock: DeskClock): Office {
+export function buildOffice(code: CodeScreen, commits: CommitScreen, stats: StatsPanel, clock: DeskClock): Office {
   const root = new THREE.Group();
   root.name = 'escritorio-vitrine';
   const std = (color: number, roughness = 0.8, metalness = 0) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
@@ -85,7 +85,7 @@ export function buildOffice(code: CodeScreen, clock: DeskClock): Office {
     leg.rotation.y = -a;
   }
 
-  // Monitores: o principal com o editor (de frente para a cadeira) e um segundo, girado, com o terminal.
+  // Monitor com o editor, de frente para a cadeira.
   const screenMat = new THREE.MeshBasicMaterial({ map: code.texture, toneMapped: false });
   const monitor = (width: number, x: number, z: number, yaw: number, face: THREE.Material) => {
     const g = new THREE.Group();
@@ -102,7 +102,22 @@ export function buildOffice(code: CodeScreen, clock: DeskClock): Office {
     return g;
   };
   monitor(0.68, DESK.x - 0.12, DESK.z - 0.2, 0, screenMat);
-  monitor(0.5, DESK.x + 0.6, DESK.z - 0.08, -0.45, new THREE.MeshBasicMaterial({ map: terminalTexture(), toneMapped: false }));
+
+  // Telão dos commits ("o que estou codando agora"): num pedestal à direita da mesa, na altura da cabeça do
+  // personagem sentado. Fica à direita dele nos dois enquadramentos (atrás dele, a cabeça cobriria o texto) e
+  // girado para a câmera do desktop.
+  const BIG = { x: DESK.x + 2.1, y: 1.3, z: DESK.z - 0.05, width: 0.9, yaw: -0.9 };
+  const big = new THREE.Group();
+  big.position.set(BIG.x, 0, BIG.z);
+  big.rotation.y = BIG.yaw;
+  root.add(big);
+  const bigH = BIG.width * 0.5625;
+  box(BIG.width + 0.05, bigH + 0.05, 0.05, mats.black, 0, BIG.y, 0, big);
+  const bigScreen = new THREE.Mesh(new THREE.PlaneGeometry(BIG.width, bigH), new THREE.MeshBasicMaterial({ map: commits.texture, toneMapped: false }));
+  bigScreen.position.set(0, BIG.y, 0.027);
+  big.add(bigScreen);
+  box(0.06, BIG.y, 0.06, mats.deskLeg, 0, BIG.y / 2, -0.06, big);
+  box(0.5, 0.03, 0.4, mats.deskLeg, 0, 0.015, -0.06, big);
 
   // Teclado, mouse, caneca e o relógio de mesa com hora e temperatura reais.
   box(0.44, 0.02, 0.14, mats.black, KEYBOARD.x, DESK.top + 0.01, KEYBOARD.z);
@@ -172,13 +187,16 @@ export function buildOffice(code: CodeScreen, clock: DeskClock): Office {
     }
   }
 
-  // Letreiro neon na parede da direita, com as cores do portfólio.
-  const neon = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.7), new THREE.MeshBasicMaterial({ map: neonTexture(), transparent: true, toneMapped: false }));
-  neon.position.set(w / 2 - 0.01, 2.05, -2.15);
-  neon.rotation.y = -Math.PI / 2;
-  root.add(neon);
+  // Painel do GitHub na parede da direita, acima do telão (o "</>" neon que ficava aqui virou o cabeçalho dele).
+  const panelW = 1.4;
+  const panelH = (panelW * StatsPanel.HEIGHT) / StatsPanel.WIDTH;
+  box(0.04, panelH + 0.06, panelW + 0.06, mats.black, w / 2 - 0.02, 2.3, -2.4);
+  const panel = new THREE.Mesh(new THREE.PlaneGeometry(panelW, panelH), new THREE.MeshBasicMaterial({ map: stats.texture, toneMapped: false }));
+  panel.position.set(w / 2 - 0.045, 2.3, -2.4);
+  panel.rotation.y = -Math.PI / 2;
+  root.add(panel);
   const neonGlow = new THREE.PointLight(0x43e6ed, 1.2, 4, 2);
-  neonGlow.position.set(w / 2 - 0.4, 2.05, -2.15);
+  neonGlow.position.set(w / 2 - 0.4, 2.3, -2.4);
   root.add(neonGlow);
 
   // Painéis de luz no teto (emissivos) e uma luz geral suave, que só acende à noite.
@@ -216,54 +234,3 @@ function woodFloor(): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 });
 }
 
-/** "</>" em neon ciano com halo, sobre fundo transparente. */
-function neonTexture(): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = 512;
-  c.height = 256;
-  const g = c.getContext('2d')!;
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.font = '700 150px ui-monospace, Menlo, Consolas, monospace';
-  g.shadowColor = '#43e6ed';
-  for (const blur of [40, 20, 8]) {
-    g.shadowBlur = blur;
-    g.fillStyle = '#9ff9ff';
-    g.fillText('</>', 256, 128);
-  }
-  g.shadowBlur = 0;
-  g.fillStyle = '#e8ffff';
-  g.fillText('</>', 256, 128);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-/** Segundo monitor: terminal com o log do build. */
-function terminalTexture(): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = 512;
-  c.height = 288;
-  const g = c.getContext('2d')!;
-  g.fillStyle = '#0b0d12';
-  g.fillRect(0, 0, 512, 288);
-  g.font = '18px ui-monospace, Menlo, Consolas, monospace';
-  const lines: [string, string][] = [
-    ['#9fd671', '$ npm run build'],
-    ['#8c9382', '> tsc --noEmit && vite build'],
-    ['#8c9382', 'vite v8 building for production...'],
-    ['#43e6ed', '✓ 412 modules transformed.'],
-    ['#8c9382', 'dist/index.html        1.2 kB'],
-    ['#8c9382', 'dist/assets/three.js   716 kB'],
-    ['#9fd671', '✓ built in 4.81s'],
-    ['#9fd671', '$ git push origin main'],
-    ['#edbd9a', '→ deploy: matheussaleh.com.br'],
-  ];
-  lines.forEach(([color, text], i) => {
-    g.fillStyle = color;
-    g.fillText(text, 16, 32 + i * 28);
-  });
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
