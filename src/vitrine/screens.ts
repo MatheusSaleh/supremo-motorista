@@ -72,6 +72,8 @@ export class CodeScreen {
   private speed = 18;
   /** true enquanto há caracteres saindo (as mãos mexem só aí). */
   typing = true;
+  /** Projeto aberto no portfólio: toma a tela por um tempo e depois volta ao rodízio. */
+  private project: { file: string; lines: string[] } | null = null;
 
   constructor() {
     const canvas = document.createElement('canvas');
@@ -89,15 +91,16 @@ export class CodeScreen {
   }
 
   update(dt: number): void {
-    const lines = SNIPPETS[this.snippet];
+    const lines = this.lines();
     const total = lines.reduce((n, l) => n + l.length + 1, 0);
     if (this.chars >= total) {
       this.typing = false;
       this.hold += dt;
-      if (this.hold > 4) {
+      if (this.hold > (this.project ? 9 : 4)) {
         this.hold = 0;
         this.chars = 0;
-        this.snippet = (this.snippet + 1) % SNIPPETS.length;
+        if (this.project) this.project = null;
+        else this.snippet = (this.snippet + 1) % SNIPPETS.length;
         this.typing = true;
         this.draw();
       }
@@ -108,8 +111,35 @@ export class CodeScreen {
     const step = Math.floor(this.acc);
     this.acc -= step;
     this.chars = Math.min(total, this.chars + step);
-    if (Math.random() < 0.08) this.speed = 10 + Math.random() * 16;
+    if (Math.random() < 0.08) this.speed = this.project ? 34 + Math.random() * 12 : 10 + Math.random() * 16;
     this.draw();
+  }
+
+  /**
+   * Mostra o projeto que o visitante abriu no portfólio, como se estivesse codando nele agora (digita rápido).
+   * Os textos vêm de outra página: chegam já cortados e só são desenhados no canvas.
+   */
+  showProject(p: { name: string; caption: string; techs: string[]; english: boolean }): void {
+    const q = (v: string) => `'${v.replace(/['\\]/g, '')}'`;
+    const slug = p.name.normalize('NFD').replace(/[^\w\s-]/g, '').trim().toLowerCase().replace(/\s+/g, '-') || 'projeto';
+    const [obj, nameKey, stackKey, open, now] = p.english
+      ? ['project', 'name', 'stack', 'portfolio.open(project);', '// open on the portfolio right now']
+      : ['projeto', 'nome', 'stack', 'portfolio.abrir(projeto);', '// aberto agora no portfólio'];
+    const stack = p.techs.length <= 3 ? [`  ${stackKey}: [${p.techs.map(q).join(', ')}],`] : [`  ${stackKey}: [`, ...p.techs.map((t) => `    ${q(t)},`), '  ],'];
+    this.project = {
+      file: `${slug}.ts`,
+      lines: [`// ${p.name}${p.caption ? ` — ${p.caption}` : ''}`, `const ${obj} = {`, `  ${nameKey}: ${q(p.name)},`, ...stack, '};', '', `${open} ${now}`],
+    };
+    this.chars = 0;
+    this.hold = 0;
+    this.acc = 0;
+    this.speed = 40;
+    this.typing = true;
+    this.draw();
+  }
+
+  private lines(): string[] {
+    return this.project?.lines ?? SNIPPETS[this.snippet];
   }
 
   private draw(): void {
@@ -124,9 +154,9 @@ export class CodeScreen {
     g.fillRect(16, 6, 230, 34);
     g.font = '600 20px ui-monospace, Menlo, Consolas, monospace';
     g.fillStyle = '#9fd671';
-    g.fillText(['main.ts', 'CotacaoFreteService.php', 'DoacaoController.java'][this.snippet], 30, 30);
+    g.fillText(this.project?.file ?? ['main.ts', 'CotacaoFreteService.php', 'DoacaoController.java'][this.snippet], 30, 30);
 
-    const lines = SNIPPETS[this.snippet];
+    const lines = this.lines();
     let left = this.chars;
     const lh = 38;
     g.font = '24px ui-monospace, Menlo, Consolas, monospace';

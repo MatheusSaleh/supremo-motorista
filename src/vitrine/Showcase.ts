@@ -13,8 +13,8 @@ import { config } from '../config';
 import { Assets } from '../core/Assets';
 import { Environment, type WeatherOverride } from '../env/Environment';
 import { Rain } from '../env/Rain';
-import { loadCharacterAsset } from '../player/CharacterAsset';
-import { SeatedDriver } from '../player/SeatedDriver';
+import { loadCharacterAsset, type CharacterAsset } from '../player/CharacterAsset';
+import { ShowcaseCharacter, type Reaction } from './character';
 import { createShowcaseCity } from './city';
 import type { Rect } from '../world/city/builder';
 import { buildOffice, CHAIR, DESK, KEYBOARD, ROOM, type Office } from './office';
@@ -56,10 +56,16 @@ export class Showcase {
   private readonly clock = new DeskClock();
   private sky!: ShowcaseSky;
   private office!: Office;
-  private driver: SeatedDriver | null = null;
+  private character: ShowcaseCharacter | null = null;
+  /** Pedido feito com a cena pausada (fora da tela) ou no meio de outro: acontece assim que der. */
+  private pending: Reaction | 'arrive' | null = null;
+  /** ?intro (o portfólio embute assim): Josué começa fora da sala e entra quando a página pede ('arrive'). */
+  private readonly intro = new URLSearchParams(location.search).has('intro');
+  /** Tempo com a cena à vista esperando a entrada; passou do limite, ele entra sozinho. */
+  private awayTime = 0;
+  private resumeDelay = 0;
   private readonly room = new THREE.Group();
   private readonly grips = { left: new THREE.Object3D(), right: new THREE.Object3D(), poleLeft: new THREE.Object3D(), poleRight: new THREE.Object3D() };
-  private neck: { bone: THREE.Object3D; base: THREE.Quaternion } | null = null;
   private readonly rainCenter = new THREE.Vector3();
   private readonly camBase = new THREE.Vector3();
   private readonly lookAt = new THREE.Vector3();
@@ -87,8 +93,13 @@ export class Showcase {
 
     window.addEventListener('resize', () => this.resize());
     window.addEventListener('message', (e: MessageEvent) => {
+      if (e.source !== window.parent) return;
       if (e.data === 'supremo-vitrine:pause') this.paused = true;
-      if (e.data === 'supremo-vitrine:resume') this.paused = false;
+      if (e.data === 'supremo-vitrine:resume' && this.paused) {
+        this.paused = false;
+        this.resumeDelay = 0.5; // dá tempo de a pessoa ver a cena antes da reação guardada
+      }
+      this.onCommand(e.data);
     });
   }
 
@@ -130,7 +141,7 @@ export class Showcase {
     hideFarDetail(city.root, this.room.position);
 
     const character = await characterPromise;
-    if (character) this.seat(new SeatedDriver(character, config));
+    if (character) this.seat(character);
 
     this.resize();
     this.applyEnvironment(1);
@@ -157,33 +168,55 @@ export class Showcase {
     requestAnimationFrame(loop);
   }
 
-  private seat(driver: SeatedDriver): void {
-    this.driver = driver;
-    const r = driver.root;
-    r.rotation.y = Math.PI; // de frente para a janela (−Z)
-    r.position.set(CHAIR.x, 0, CHAIR.z);
-    this.room.add(r);
-    driver.visible = true;
-    r.traverse((o) => {
-      if (o instanceof THREE.Mesh) o.castShadow = true;
-    });
+  private seat(asset: CharacterAsset): void {
+    // Para comemorar, fica de pé ao lado da cadeira (do lado da câmera), longe da mesa.
+    // Entra pela esquerda da sala, junto à janela (fora do quadro nos dois enquadramentos), até o lado da cadeira.
+    const character = new ShowcaseCharacter(
+      asset,
+      config,
+      CHAIR,
+      { x: CHAIR.x - 0.72, z: CHAIR.z - 0.10 },
+      { x: -3.9, z: -1.7 },
+      this.intro,
+    );
+    this.character = character;
+    this.room.add(character.root);
 
-    // Senta o quadril no assento, seja qual for a altura da pose "sentado" do clip.
-    const hips = r.getObjectByName('mixamorigHips');
-    if (hips) {
-      this.room.updateMatrixWorld(true);
-      const p = hips.getWorldPosition(new THREE.Vector3());
-      this.room.worldToLocal(p);
-      r.position.y += CHAIR.seat + 0.1 - p.y;
-      r.position.z += CHAIR.z + 0.05 - p.z;
-    }
-    const neck = r.getObjectByName('mixamorigNeck');
-    if (neck) this.neck = { bone: neck, base: neck.quaternion.clone() };
-
-    // Cotovelos para fora e para baixo, atrás das mãos.
+    // Pontas dos dedos sobre as teclas; cotovelos para fora e para baixo, atrás delas.
+    this.grips.left.userData.base = new THREE.Vector3(KEYBOARD.x - 0.105, KEYBOARD.y + 0.011, KEYBOARD.z);
+    this.grips.right.userData.base = new THREE.Vector3(KEYBOARD.x + 0.105, KEYBOARD.y + 0.011, KEYBOARD.z);
     this.grips.poleLeft.position.set(KEYBOARD.x - 0.55, DESK.top - 0.2, CHAIR.z + 0.15);
     this.grips.poleRight.position.set(KEYBOARD.x + 0.55, DESK.top - 0.2, CHAIR.z + 0.15);
     this.room.add(this.grips.left, this.grips.right, this.grips.poleLeft, this.grips.poleRight);
+  }
+
+  /**
+   * Comandos do portfólio (o conteúdo vem de outra página: só textos curtos, validados aqui).
+   *  - { type: 'supremo-vitrine:react', action: 'arrive' }: (com ?intro) entra caminhando e senta;
+   *  - { type: 'supremo-vitrine:react', action: 'wave' | 'cheer' }: acena sentado ou levanta para comemorar;
+   *  - { type: 'supremo-vitrine:project', name, caption, techs, locale }: o monitor mostra o projeto aberto.
+   */
+  private onCommand(data: unknown): void {
+    if (typeof data !== 'object' || data === null) return;
+    const msg = data as Record<string, unknown>;
+    if (msg.type === 'supremo-vitrine:react' && (msg.action === 'arrive' || msg.action === 'wave' || msg.action === 'cheer')) {
+      // Antes de entrar na sala, só a entrada conta (um aceno pedido nesse meio-tempo não fica para depois).
+      const waitingEntry = this.pending === 'arrive' || (this.character?.away ?? this.intro);
+      if (msg.action !== 'arrive' && waitingEntry) return;
+      if (this.paused || !this.reactNow(msg.action)) this.pending = msg.action;
+      else if (msg.action === 'arrive') this.pending = null;
+    } else if (msg.type === 'supremo-vitrine:project' && typeof msg.name === 'string') {
+      const text = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '');
+      const techs = Array.isArray(msg.techs) ? msg.techs.filter((t): t is string => typeof t === 'string').slice(0, 6).map((t) => t.slice(0, 24)) : [];
+      this.code.showProject({ name: text(msg.name, 40), caption: text(msg.caption, 48), techs, english: msg.locale === 'en' });
+    }
+  }
+
+  /** Reage já (virado para a câmera atual) ou entra; false se ainda está no meio de outra coisa. */
+  private reactNow(kind: Reaction | 'arrive'): boolean {
+    if (!this.character) return false;
+    if (kind === 'arrive') return this.character.arrive();
+    return this.character.react(kind, this.room.worldToLocal(this.camBase.clone()));
   }
 
   private frame(dt: number): void {
@@ -195,7 +228,13 @@ export class Showcase {
       this.applyEnvironment(1);
     }
     this.code.update(dt);
-    this.animateTyping();
+    this.resumeDelay -= dt;
+    if (this.pending && this.resumeDelay <= 0 && this.reactNow(this.pending)) this.pending = null;
+    if (this.character?.away && (this.awayTime += dt) > 12) this.character.arrive(); // o pedido não veio
+    if (this.character) {
+      this.room.updateMatrixWorld(true);
+      this.character.update(dt, this.code.typing, this.grips);
+    }
 
     // Balanço leve da câmera (respiração), para a cena parecer viva.
     const t = this.time;
@@ -226,27 +265,6 @@ export class Showcase {
     this.office.ceiling.intensity = 9 - 4 * dim;
     this.office.ceilingPanels.emissiveIntensity = 1.4 - 0.6 * dim;
     this.clock.set(s.clock, s.live ? s.weather.temperature : null, s.weather.rain > 0);
-  }
-
-  /** Mãos "digitando" (alvos da IK pulando sobre o teclado) e a cabeça olhando de vez em quando o 2º monitor. */
-  private animateTyping(): void {
-    if (!this.driver) return;
-    const t = this.time;
-    const typing = this.code.typing ? 1 : 0;
-    const hop = (phase: number) => typing * Math.max(0, Math.sin(t * 17 + phase)) * 0.018;
-    this.grips.left.position.set(KEYBOARD.x - 0.15 + Math.sin(t * 2.3) * 0.02 * typing, KEYBOARD.y + 0.03 + hop(0), KEYBOARD.z + 0.01);
-    this.grips.right.position.set(KEYBOARD.x + 0.15 + Math.sin(t * 1.9 + 1) * 0.02 * typing, KEYBOARD.y + 0.03 + hop(Math.PI * 0.7), KEYBOARD.z + 0.01);
-    this.room.updateMatrixWorld(true);
-    this.driver.update(this.grips);
-
-    if (this.neck) {
-      // A cada ~9 s olha um pouco para o monitor da direita, e volta.
-      const glance = Math.max(0, Math.sin(t * 0.7)) ** 8;
-      const yaw = -0.45 * glance + Math.sin(t * 0.5) * 0.04;
-      const pitch = 0.12 + Math.sin(t * 0.9) * 0.02;
-      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'));
-      this.neck.bone.quaternion.copy(this.neck.base).multiply(q);
-    }
   }
 
   private resize(): void {
