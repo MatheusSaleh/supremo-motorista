@@ -1,0 +1,44 @@
+# Multiplayer em produção, isolado do resto da máquina (ver "Instalar na VPS" em docs/MULTIPLAYER.md).
+#   cd server && docker compose up -d --build
+#
+# - Rede própria do projeto: o container não enxerga outros containers nem bancos da VPS.
+# - Porta publicada só em 127.0.0.1: quem fala com ela é o Nginx local (wss:// público).
+# - Sem privilégios: usuário "node", sistema de arquivos só leitura, nenhuma capability.
+# - Limites de memória, CPU e processos: um pico de jogadores (ou um ataque) fica preso aqui
+#   e não tira recursos dos outros serviços da máquina.
+name: supremo-mp
+
+services:
+  mp:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    image: supremo-mp:latest
+    container_name: supremo-mp
+    restart: unless-stopped
+    environment:
+      PORT: 8787
+      # Conexões no servidor inteiro. 40 = 5 salas cheias; o padrão do código (200) é demais
+      # para uma VPS de 1 vCPU dividida com outros serviços.
+      MAX_CLIENTS: ${MAX_CLIENTS:-40}
+      # ALLOWED_ORIGINS: sem definir, vale o padrão do código (site, Vercel e desktop).
+    ports:
+      - "127.0.0.1:${MP_PORT:-8787}:8787"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    memswap_limit: 128m
+    cpus: 0.3
+    pids_limit: 64
+    # Se faltar memória na máquina, este é dos primeiros a ser encerrado.
+    oom_score_adj: 900
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -1,0 +1,6 @@
+# Contexto do build = raiz do repositório. Entra só o que o servidor usa (o resto são assets do jogo).
+*
+!server/package.json
+!server/package-lock.json
+!server/index.ts
+!src/net/protocol.ts
