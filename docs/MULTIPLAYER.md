@@ -94,7 +94,7 @@ Checagem de tipos do servidor: `npm run typecheck:server`.
 | Jogo (build) | `VITE_MP_ENABLED` | ausente: a aba **Online** some no build de produção (em dev aparece sempre) |
 | Servidor | `PORT` | `8787` |
 | Servidor | `ALLOWED_ORIGINS` | site, `supremo-motorista.vercel.app`, `app://game` (desktop); localhost sempre liberado |
-| Servidor | `MAX_CLIENTS` | `200` |
+| Servidor | `MAX_CLIENTS` | `200` (o `server/docker-compose.yml` de produção usa `40`) |
 
 **Limites do servidor:**
 - até 80 mensagens por segundo por jogador; quem insiste além disso é desconectado;
@@ -104,112 +104,98 @@ Checagem de tipos do servidor: `npm run typecheck:server`.
 - apelidos limpos: até 16 caracteres, só letras, números, espaço, `.`, `-` e `_`;
 - poses de perseguidores, eventos e tomates só são aceitos do anfitrião da sala.
 
-## Instalar na VPS (Ubuntu)
+## Instalar na VPS
 
-Os comandos abaixo supõem Ubuntu 22.04/24.04, acesso com `sudo` e o domínio `matheussaleh.com.br`.
+O servidor roda num container (`server/Dockerfile` e `server/docker-compose.yml`), atrás do Nginx da
+VPS e do Cloudflare. Assim o Node não precisa ser instalado na máquina, e o multiplayer fica isolado dos
+outros serviços dela: rede própria, porta só em `127.0.0.1`, usuário sem privilégios, sistema de
+arquivos só leitura e limites de memória (128 MB), CPU (30% de um núcleo) e conexões (40).
 
-### 1. DNS
+```
+navegador ── wss ──> Cloudflare (proxy) ── https ──> Nginx da VPS ── ws ──> 127.0.0.1:8787 (container)
+```
 
-Crie um registro **A** `mp` → IP da VPS, onde o DNS do domínio é gerenciado (Vercel ou Registro.br).
-Confira com `dig +short mp.matheussaleh.com.br` antes de seguir.
+Os comandos supõem Ubuntu com Docker e Nginx já instalados, o domínio `matheussaleh.com.br` no
+Cloudflare e um usuário no grupo `docker`.
 
-### 2. Node.js 24 e o código
+> **Firewall:** não é preciso abrir nada. Se a VPS só aceita as portas 80/443 vindas do Cloudflare,
+> **não rode** `ufw allow 'Nginx Full'`: isso abre essas portas para a internet inteira e expõe todos os
+> sites da máquina sem passar pelo Cloudflare. A porta 8787 nunca é aberta: só o Nginx fala com ela.
+
+### 1. DNS e certificado (Cloudflare)
+
+1. **DNS → Registros:** registro **A** `mp` → IP da VPS, com o proxy **ligado** (nuvem laranja). O
+   Cloudflare repassa WebSocket em todos os planos, e o ping de 10 s do servidor mantém a conexão aberta
+   (o Cloudflare fecha conexões paradas por mais de 100 s).
+2. **SSL/TLS → Visão geral:** modo **Completo (estrito)**.
+3. **SSL/TLS → Servidor de origem → Criar certificado:** RSA, nomes `*.matheussaleh.com.br` e
+   `matheussaleh.com.br`, 15 anos. Salve na VPS:
 
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
-sudo apt-get install -y nodejs git nginx
-sudo useradd --system --create-home --home-dir /opt/supremo-motorista --shell /usr/sbin/nologin supremo
-sudo -u supremo git clone https://github.com/MatheusSaleh/supremo-motorista.git /opt/supremo-motorista/app
-cd /opt/supremo-motorista/app/server && sudo -u supremo npm ci --omit=dev
+sudo mkdir -p /etc/ssl/cloudflare && sudo chmod 700 /etc/ssl/cloudflare
+sudo nano /etc/ssl/cloudflare/matheussaleh-origin.pem   # "Certificado de origem"
+sudo nano /etc/ssl/cloudflare/matheussaleh-origin.key   # "Chave privada" (só aparece uma vez)
+sudo chmod 600 /etc/ssl/cloudflare/matheussaleh-origin.*
 ```
 
-O servidor importa `src/net/protocol.ts`, por isso o repositório é clonado inteiro.
+O certificado de origem só é aceito pelo Cloudflare, por isso o proxy precisa ficar ligado. Se já houver
+um certificado para `*.matheussaleh.com.br` na máquina, use o mesmo.
 
-### 3. Serviço (systemd)
-
-`/etc/systemd/system/supremo-mp.service`:
-
-```ini
-[Unit]
-Description=Supremo Motorista - multiplayer
-After=network.target
-
-[Service]
-User=supremo
-WorkingDirectory=/opt/supremo-motorista/app/server
-ExecStart=/usr/bin/node index.ts
-Environment=PORT=8787
-Restart=always
-RestartSec=3
-NoNewPrivileges=true
-
-[Install]
-WantedBy=multi-user.target
-```
+### 2. Código e container
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now supremo-mp
-sudo systemctl status supremo-mp        # deve mostrar "multiplayer ouvindo na porta 8787"
+sudo mkdir -p /opt/supremo-mp && sudo chown "$USER" /opt/supremo-mp
+git clone --depth 1 https://github.com/MatheusSaleh/supremo-motorista.git /opt/supremo-mp/app
+cd /opt/supremo-mp/app/server
+ss -ltnp | grep ':8787' || echo "8787 livre"            # se estiver ocupada: MP_PORT=8788 no comando abaixo
+COMPOSE_PARALLEL_LIMIT=1 nice -n 19 docker compose up -d --build
+docker compose ps                                       # "healthy" depois de uns 10 s
+docker compose logs mp                                  # "multiplayer ouvindo na porta 8787"
 ```
 
-### 4. Nginx + certificado (wss://)
-
-`/etc/nginx/sites-available/mp.matheussaleh.com.br`:
-
-```nginx
-server {
-    listen 80;
-    server_name mp.matheussaleh.com.br;
-
-    location / {
-        proxy_pass http://127.0.0.1:8787;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header Origin $http_origin;
-        proxy_read_timeout 3600s;
-        proxy_send_timeout 3600s;
-    }
-}
-```
+Conferências de isolamento:
 
 ```bash
+ss -ltnp | grep 8787                                    # só 127.0.0.1:8787
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8787/   # 426: o servidor só fala WebSocket
+docker stats --no-stream supremo-mp                     # limite de 128 MiB
+```
+
+### 3. Nginx (wss://)
+
+Use [`server/nginx.conf.example`](../server/nginx.conf.example). Ele só deixa passar o WebSocket na raiz
+(o resto é fechado sem resposta) e limita conexões por IP: até 4 abertas e 20 novas por minuto. Sem
+isso, um único cliente poderia ocupar as 40 vagas do servidor.
+
+```bash
+sudo cp /opt/supremo-mp/app/server/nginx.conf.example /etc/nginx/sites-available/mp.matheussaleh.com.br
 sudo ln -s /etc/nginx/sites-available/mp.matheussaleh.com.br /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
-sudo apt-get install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d mp.matheussaleh.com.br     # cria o HTTPS (porta 443) e renova sozinho
 ```
 
-O certificado é obrigatório: o site é HTTPS, e o navegador bloqueia `ws://` sem criptografia.
+Os limites por IP dependem de o Nginx enxergar o IP real do jogador, e não o do Cloudflare
+(`real_ip_header CF-Connecting-IP` com as faixas do Cloudflare em `set_real_ip_from`).
 
-### 5. Firewall
-
-```bash
-sudo ufw allow OpenSSH
-sudo ufw allow 'Nginx Full'
-sudo ufw enable
-```
-
-A porta 8787 não fica aberta para fora: só o Nginx fala com ela.
-
-### 6. Ligar a opção no site
+### 4. Ligar a opção no site
 
 Na Vercel, no projeto do jogo: **Settings → Environment Variables**, crie `VITE_MP_ENABLED` = `true`
 (Production) e faça um **Redeploy**. Até isso, a aba Online não aparece no site.
 
-### 7. Testar
+### 5. Testar
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" https://mp.matheussaleh.com.br/   # 520 ou 444: sem WebSocket, fechado
+```
 
 Abra o jogo no site em dois navegadores, ligue **Pausa → Online** nos dois e confira se um vê o carro
-do outro. Logs: `journalctl -u supremo-mp -f`.
+do outro. Logs: `cd /opt/supremo-mp/app/server && docker compose logs -f mp`.
 
 ### Atualizar
 
 ```bash
-cd /opt/supremo-motorista/app && sudo -u supremo git pull
-cd server && sudo -u supremo npm ci --omit=dev
-sudo systemctl restart supremo-mp
+cd /opt/supremo-mp/app && git pull
+cd server && COMPOSE_PARALLEL_LIMIT=1 nice -n 19 docker compose up -d --build
+docker image prune -f
 ```
 
 Se `PROTOCOL_VERSION` mudar, quem estiver com a página antiga recebe o aviso para recarregar.
