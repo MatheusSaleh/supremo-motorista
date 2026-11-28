@@ -8,7 +8,8 @@ const WIN_Z = -ROOM.d / 2;
 
 /** Onde ficam a mesa, o teclado e a cadeira (o personagem senta de frente para a janela). */
 export const DESK = { x: 1.5, z: -1.95, top: 0.76, w: 1.7, d: 0.8 };
-export const CHAIR = { x: DESK.x, z: -1.05, seat: 0.5 };
+export const RUG_TOP = 0.01;
+export const CHAIR = { x: DESK.x, z: -1.05, seat: 0.5, width: 0.6, depth: 0.55 };
 export const KEYBOARD = { x: DESK.x, y: DESK.top + 0.02, z: DESK.z + 0.24 };
 
 export interface Office {
@@ -72,10 +73,10 @@ export function buildOffice(code: CodeScreen, clock: DeskClock): Office {
   root.add(glass);
 
   // Tapete, mesa e cadeira.
-  box(3.2, 0.01, 2.4, mats.rug, DESK.x, 0.005, (DESK.z + CHAIR.z) / 2).castShadow = false;
+  box(3.2, RUG_TOP, 2.4, mats.rug, DESK.x, RUG_TOP / 2, (DESK.z + CHAIR.z) / 2).castShadow = false;
   box(DESK.w, 0.04, DESK.d, mats.desk, DESK.x, DESK.top - 0.02, DESK.z);
   for (const sx of [-1, 1]) box(0.05, DESK.top - 0.04, DESK.d - 0.1, mats.deskLeg, DESK.x + sx * (DESK.w / 2 - 0.06), (DESK.top - 0.04) / 2, DESK.z);
-  box(0.6, 0.08, 0.55, mats.chair, CHAIR.x, CHAIR.seat - 0.04, CHAIR.z);
+  box(CHAIR.width, 0.08, CHAIR.depth, mats.chair, CHAIR.x, CHAIR.seat - 0.04, CHAIR.z);
   box(0.56, 0.62, 0.07, mats.chair, CHAIR.x, CHAIR.seat + 0.36, CHAIR.z + 0.3).rotation.x = -0.12;
   box(0.06, CHAIR.seat - 0.08, 0.06, mats.deskLeg, CHAIR.x, (CHAIR.seat - 0.08) / 2, CHAIR.z);
   for (let i = 0; i < 5; i++) {
