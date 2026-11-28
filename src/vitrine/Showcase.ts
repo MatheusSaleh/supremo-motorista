@@ -18,7 +18,7 @@ import { ShowcaseCharacter, type Reaction } from './character';
 import { createShowcaseCity } from './city';
 import type { Rect } from '../world/city/builder';
 import { buildOffice, CHAIR, DESK, KEYBOARD, ROOM, type Office } from './office';
-import { CodeScreen, DeskClock } from './screens';
+import { CodeScreen, CommitScreen, DeskClock, StatsPanel, type Commit, type GithubActivity } from './screens';
 import { ShowcaseSky } from './sky';
 
 /**
@@ -31,7 +31,8 @@ const SITE = { x: 0, z: 260, height: 34, yaw: 0.55 };
  * graus) é fixo em cada um e o vertical se ajusta, para a composição ficar igual em qualquer tamanho.
  *  - paisagem (desktop, fundo do topo): atrás e à esquerda do personagem; texto do portfólio à esquerda,
  *    Congresso a ~60% da largura, mesa e personagem a ~80%;
- *  - retrato (celular, quadro no topo): mais perto, por cima do ombro, com o Congresso no alto da janela.
+ *  - retrato (celular, quadro no topo): mais perto, por cima do ombro, com o Congresso no alto da janela e o telão
+ *    dos commits à direita do personagem.
  */
 interface CameraPreset {
   pos: THREE.Vector3;
@@ -41,7 +42,7 @@ interface CameraPreset {
   probeAspect: number;
 }
 const LANDSCAPE: CameraPreset = { pos: new THREE.Vector3(-2.2, 1.66, 2.2), look: new THREE.Vector3(0.18, 1.3, -3.2), hfov: 80, probeAspect: 2.8 };
-const PORTRAIT: CameraPreset = { pos: new THREE.Vector3(0.2, 1.72, 0.4), look: new THREE.Vector3(2.15, 1.42, -3.2), hfov: 56, probeAspect: 0.9 };
+const PORTRAIT: CameraPreset = { pos: new THREE.Vector3(0.2, 1.72, 0.4), look: new THREE.Vector3(2.9, 1.42, -3.2), hfov: 56, probeAspect: 0.9 };
 /** Abaixo desta proporção, o enquadramento retrato. */
 const PORTRAIT_BELOW = 1.25;
 const FPS = 30;
@@ -53,6 +54,8 @@ export class Showcase {
   private readonly env = new Environment(true);
   private readonly rain = new Rain();
   private readonly code = new CodeScreen();
+  private readonly commits = new CommitScreen();
+  private readonly stats = new StatsPanel();
   private readonly clock = new DeskClock();
   private sky!: ShowcaseSky;
   private office!: Office;
@@ -128,7 +131,7 @@ export class Showcase {
     this.room.rotation.y = SITE.yaw;
     this.room.updateMatrixWorld(true);
     this.scene.add(this.room);
-    this.office = buildOffice(this.code, this.clock);
+    this.office = buildOffice(this.code, this.commits, this.stats, this.clock);
     this.room.add(this.office.root);
 
     const focus = new THREE.Vector3(SITE.x, floorY + ROOM.h / 2, SITE.z);
@@ -194,7 +197,11 @@ export class Showcase {
    * Comandos do portfólio (o conteúdo vem de outra página: só textos curtos, validados aqui).
    *  - { type: 'supremo-vitrine:react', action: 'arrive' }: (com ?intro) entra caminhando e senta;
    *  - { type: 'supremo-vitrine:react', action: 'wave' | 'cheer' }: acena sentado ou levanta para comemorar;
-   *  - { type: 'supremo-vitrine:project', name, caption, techs, locale }: o monitor mostra o projeto aberto.
+   *  - { type: 'supremo-vitrine:project', name, caption, techs, locale }: o monitor mostra o projeto aberto;
+   *  - { type: 'supremo-vitrine:commits', commits: [{ repo, message, date }], locale }: o telão atrás da mesa mostra os
+   *    commits públicos mais recentes ("o que estou codando agora"), com há quanto tempo cada um foi feito;
+   *  - { type: 'supremo-vitrine:github', stats: { commits, pullRequests, issues, commitsByYear, languages }, locale }:
+   *    o painel da parede mostra a atividade pública no GitHub.
    */
   private onCommand(data: unknown): void {
     if (typeof data !== 'object' || data === null) return;
@@ -209,6 +216,19 @@ export class Showcase {
       const text = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '');
       const techs = Array.isArray(msg.techs) ? msg.techs.filter((t): t is string => typeof t === 'string').slice(0, 6).map((t) => t.slice(0, 24)) : [];
       this.code.showProject({ name: text(msg.name, 40), caption: text(msg.caption, 48), techs, english: msg.locale === 'en' });
+    } else if (msg.type === 'supremo-vitrine:commits' && Array.isArray(msg.commits)) {
+      const commits: Commit[] = [];
+      for (const c of msg.commits.slice(0, CommitScreen.MAX) as unknown[]) {
+        if (typeof c !== 'object' || c === null) continue;
+        const { repo, message, date } = c as Record<string, unknown>;
+        const when = new Date(typeof date === 'string' ? date : NaN);
+        if (typeof repo !== 'string' || typeof message !== 'string' || Number.isNaN(when.getTime())) continue;
+        commits.push({ repo: repo.slice(0, 40), message: message.slice(0, 120), date: when });
+      }
+      this.commits.showCommits(commits, msg.locale === 'en');
+    } else if (msg.type === 'supremo-vitrine:github') {
+      const stats = parseActivity(msg.stats);
+      if (stats) this.stats.show(stats, msg.locale === 'en');
     }
   }
 
@@ -228,6 +248,7 @@ export class Showcase {
       this.applyEnvironment(1);
     }
     this.code.update(dt);
+    this.commits.update(dt);
     this.resumeDelay -= dt;
     if (this.pending && this.resumeDelay <= 0 && this.reactNow(this.pending)) this.pending = null;
     if (this.character?.away && (this.awayTime += dt) > 12) this.character.arrive(); // o pedido não veio
@@ -280,6 +301,31 @@ export class Showcase {
     this.camera.fov = THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(vfov), 34, 80);
     this.camera.updateProjectionMatrix();
   }
+}
+
+/** Valida os números do painel do GitHub (vêm de outra página): contagens inteiras, nomes curtos. */
+function parseActivity(data: unknown): GithubActivity | null {
+  if (typeof data !== 'object' || data === null) return null;
+  const d = data as Record<string, unknown>;
+  const count = (v: unknown) => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < 1e7 ? v : null);
+  const commits = count(d.commits);
+  const pullRequests = count(d.pullRequests);
+  const issues = count(d.issues);
+  if (commits === null || pullRequests === null || issues === null) return null;
+  const commitsByYear: GithubActivity['commitsByYear'] = [];
+  for (const y of (Array.isArray(d.commitsByYear) ? d.commitsByYear : []).slice(0, 6) as unknown[]) {
+    const { year, count: n } = (typeof y === 'object' && y !== null ? y : {}) as Record<string, unknown>;
+    const yy = count(year);
+    const nn = count(n);
+    if (yy !== null && yy > 1990 && yy < 3000 && nn !== null) commitsByYear.push({ year: yy, count: nn });
+  }
+  const languages: GithubActivity['languages'] = [];
+  for (const l of (Array.isArray(d.languages) ? d.languages : []).slice(0, 4) as unknown[]) {
+    const { name, share } = (typeof l === 'object' && l !== null ? l : {}) as Record<string, unknown>;
+    const pct = count(share);
+    if (typeof name === 'string' && name && pct !== null && pct <= 100) languages.push({ name: name.slice(0, 20), share: pct });
+  }
+  return { commits, pullRequests, issues, commitsByYear, languages };
 }
 
 /** Etapas da montagem, na ordem: personagem (download, 0..1), cidade e shaders (0 no início, 1 no fim). */
